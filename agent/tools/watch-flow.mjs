@@ -81,7 +81,9 @@ page.on("response", async (res) => {
         .replace(/("(?:access_token|refresh_token|token)"\s*:\s*")[^"]+/gi, "$1***")
         .slice(0, 600);
       log("[http-resp]", res.status(), u.split("?")[0], red);
-    } catch {}
+    } catch {
+      /* body 不可读：跳过 */
+    }
   }
 });
 

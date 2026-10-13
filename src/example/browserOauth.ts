@@ -2,10 +2,13 @@ import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import { PuppeteerExtra } from "puppeteer-extra";
 
-export async function getAuthCode(username: string, password: string) {
+export async function getAuthCode(
+  username: string,
+  password: string,
+): Promise<string> {
   (puppeteer as unknown as PuppeteerExtra).use(StealthPlugin());
 
-  return new Promise<string>(async (resolve) => {
+  {
     const browser = await (puppeteer as unknown as PuppeteerExtra).launch({
       headless: false, // or 'new' in the latest Puppeteer to get partial headless mode
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
@@ -91,8 +94,8 @@ export async function getAuthCode(username: string, password: string) {
     }
 
     await browser.close();
-    resolve(oauthCode);
-  });
+    return oauthCode;
+  }
 }
 
 function randomDelay(minSeconds: number, maxSeconds: number): number {

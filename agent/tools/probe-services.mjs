@@ -1,7 +1,7 @@
 // 黑盒服务普查 runner：登录 paper 会话后逐个请求服务并录制原始帧。
 // 用法: node agent/tools/probe-services.mjs [service ...]   # 不传参数=全量
 // 依赖 agent/tools/.env.blackbox 里的 TOS_GUEST_ACCESS_TOKEN / TOS_GUEST_WS_URL
-import { mkdirSync, existsSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, appendFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import WebSocket from "ws";

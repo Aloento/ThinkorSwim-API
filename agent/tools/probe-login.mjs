@@ -65,7 +65,9 @@ ws.on("message", (data) => {
             b.accessTokenInfo.refreshToken.slice(0, 12) + "…len" + b.accessTokenInfo.refreshToken.length;
       }
     }
-  } catch {}
+  } catch {
+    /* redact 失败不影响原样转发 */
+  }
   log("RECV", JSON.stringify(redacted, null, 1));
   if (phase === "login") {
     phase = "done";

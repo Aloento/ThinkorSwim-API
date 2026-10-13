@@ -132,16 +132,8 @@ async function main() {
       : "wss://thinkorswim-services.schwab.com/Services/WsJson";
     console.log("tradingSystem=%s → %s (tokenLen=%d)", tradingSystem, wsUrl, session.token.length);
 
-    // 收割 cookies（保守起见带上）
-    const tradeCookies = await browser.cookies("https://trade.thinkorswim.com");
-    const svcCookies = await browser.cookies(
-      paper ? "https://papermoney-services.schwab.com" : "https://thinkorswim-services.schwab.com",
-    );
-    const cookieHeader = [...tradeCookies, ...svcCookies]
-      .filter((c) => c.value)
-      .map((c) => `${c.name}=${c.value}`)
-      .join("; ");
-
+    // 实测确认：login 复用 token 无需 Cookie（v3 带全套 cookies 仍失败，
+    // 失败根因是 DC 连错——paper token 必须连 papermoney-services）。
     // 新 WS 连接 + login（token 复用验证：token 应可跨连接使用）
     const ws = new WebSocket(wsUrl, {
       headers: {
