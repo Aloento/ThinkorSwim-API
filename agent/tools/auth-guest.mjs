@@ -179,21 +179,95 @@ async function main() {
     }
     console.log("authCode obtained");
 
-    // 用 authCode 走 wsjson login/schwab 换 token
-    const { RealWsJsonClient } = await import(
-      join(here, "..", "..", "dist", "client", "realWsJsonClient.js")
-    ).catch(async () => {
-      // dist 未构建时直接裸协议
-      return null;
+    // 用 authCode 走 wsjson login/schwab 换 token（裸协议，dump 原始响应到 artifacts）
+    const { default: WebSocket } = await import("ws");
+    const ws = new WebSocket(
+      "wss://thinkorswim-services.schwab.com/Services/WsJson",
+      {
+        headers: {
+          Pragma: "no-cache",
+          Origin: "https://trade.thinkorswim.com",
+          "Cache-Control": "no-cache",
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
+        },
+      },
+    );
+    const result = await new Promise((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error("login/schwab timeout (20s)")),
+        20000,
+      );
+      let sent = false;
+      ws.on("open", () => {
+        ws.send(
+          JSON.stringify({
+            ver: "27.*.*",
+            fmt: "json-patches-structured",
+            heartbeat: "2s",
+          }),
+        );
+      });
+      ws.on("message", (data) => {
+        const msg = JSON.parse(data.toString());
+        if (msg.heartbeat) return;
+        if (!sent && msg.session) {
+          sent = true;
+          ws.send(
+            JSON.stringify({
+              payload: [
+                {
+                  header: { service: "login/schwab", id: "login/schwab", ver: 0 },
+                  params: {
+                    authCode,
+                    clientId: "TOSWeb",
+                    redirectUri: "https://trade.thinkorswim.com/oauth",
+                    tag: "TOSWeb",
+                  },
+                },
+              ],
+            }),
+          );
+          return;
+        }
+        const item = msg.payload?.[0];
+        if (!item) return;
+        // 原始响应留档（供协议漂移分析）
+        const artDir = join(here, "..", "artifacts");
+        mkdirSync(artDir, { recursive: true });
+        writeFileSync(
+          join(artDir, "login-schwab-raw.json"),
+          JSON.stringify(msg, null, 2),
+        );
+        clearTimeout(timer);
+        resolve(item.body);
+        ws.close();
+      });
+      ws.on("error", (e) => {
+        clearTimeout(timer);
+        reject(e);
+      });
     });
 
-    let accessToken;
-    let refreshToken;
-    if (RealWsJsonClient) {
-      const client = new RealWsJsonClient();
-      const body = await client.authenticateWithAuthCode(authCode);
-      accessToken = client.accessToken ?? body?.token;
-      refreshToken = client.refreshToken;
+    const body = result;
+    console.log(
+      "login/schwab body keys:",
+      Object.keys(body).join(","),
+      "authenticated=",
+      body.authenticated,
+      "status=",
+      body.authenticationStatus,
+    );
+    let accessToken = body.token;
+    let refreshToken =
+      body.accessTokenInfo?.refreshToken ??
+      body.refreshToken ??
+      body.refresh_token ??
+      undefined;
+    if (!accessToken) {
+      throw new Error(
+        `token exchange failed: ${body.message ?? body.authenticationStatus ?? "no token in body"}`,
+      );
     }
     if (!accessToken) {
       throw new Error("token exchange failed (no accessToken)");
