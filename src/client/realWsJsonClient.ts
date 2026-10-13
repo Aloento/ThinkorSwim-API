@@ -415,7 +415,7 @@ export class RealWsJsonClient implements WsJsonClient {
     }) as Observable<NonNullable<ParsedPayloadResponse>>;
   }
 
-  // eslint-disable-line @typescript-eslint/no-explicit-any
+   
   private sendMessage(data: any) {
     logger("➡️\tsending %O", data);
     const msg = JSON.stringify(data);

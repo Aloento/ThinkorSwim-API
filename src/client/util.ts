@@ -17,7 +17,7 @@ export function ensure<T>(value: T, msg: string): T {
   return value;
 }
 
-// eslint-disable-line @typescript-eslint/no-explicit-any
+ 
 export function debugLog(...args: any[]) {
   if (process.env.NODE_ENV === "development") {
     console.log(...args);

@@ -59,10 +59,10 @@ export default class MockWsJsonClient implements WsJsonClient {
     });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
+   
   disconnect(): void {}
 
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
+   
   ensureConnected(): void {}
 
   isConnected(): boolean {
