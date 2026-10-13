@@ -21,7 +21,6 @@ const login = await client.authenticateWithAccessToken({ accessToken: token });
 console.log("[smoke] login OK:", login?.authenticationStatus, "user=", login?.userCode);
 
 const accounts = await client.getAccounts();
-const first = accounts.body.items?.[0];
 console.log("[smoke] accounts:", accounts.body.items?.map((a) => a.code).join(","));
 
 const statement = await client.getStatement("COMBINED ACCOUNT");
