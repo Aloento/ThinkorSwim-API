@@ -138,6 +138,14 @@ const PROBES = [
   { service: "demo_account/set_balance", id: "probe-demo-set", params: {}, waitMs: 2500 }, // 空参只验存在性
   { service: "demo_account/adjust_cash", id: "probe-demo-adj", params: {}, waitMs: 2500 }, // 空参只验存在性
   // ⚠️ logoff/schwab 会终止本会话——从常规矩阵移除，只允许单独手动跑
+  // —— 第四轮：形状确认（成功帧，参数按错误帧枚举修正）——
+  { service: "quotes/get", id: "probe-qget4", params: { symbols: ["AAPL"], fields: ["LAST", "BID", "ASK", "VOLUME"] }, waitMs: 3000 },
+  { service: "news_headers/get_relevant", id: "probe-news-rel4", params: { symbols: ["AAPL"], limit: 5, sortMode: "TIME" }, waitMs: 3000 },
+  { service: "study/subscribe", id: "probe-study-sub4", params: { symbols: ["AAPL"], type: "CHART", studies: ["SimpleMovingAvg"] }, waitMs: 3000 },
+  { service: "scan_query/get", id: "probe-scan-q4", params: { watchlistId: -2 }, waitMs: 3000 },
+  { service: "scan_filter/parameters", id: "probe-scan-par4", params: { filter: "% change" }, waitMs: 3000 },
+  { service: "fundamentals/history", id: "probe-fund-hist4", params: { symbol: "AAPL", time: "QUARTERLY", fields: ["REVENUE", "NET_INCOME"] }, waitMs: 4000 },
+  { service: "tax_lot/update", id: "probe-taxlot-upd", params: {}, waitMs: 2500 }, // 存在性
 ];
 
 async function main() {
