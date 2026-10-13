@@ -249,6 +249,103 @@ async function main() {
       await sleep(8000);
       break;
 
+    case "W5": // watchlist 写：create→rename→delete（错误帧会暴露参数名）
+      send(ws, "watchlist/create", "probe-wl-create", {
+        watchlistName: "ProbeWL",
+        symbols: ["AAPL", "SPY"],
+      });
+      await sleep(4000);
+      send(ws, "watchlist/categories", "probe-wl-cat", { categories: ["PERSONAL"] });
+      await sleep(4000);
+      break;
+
+    case "W5b": // watchlist add_symbols / rename / delete（参数名由错误帧暴露）
+      {
+        const wlId = Number(process.argv[3]);
+        if (!wlId) {
+          console.error(
+            "usage: probe-write.mjs W5b <watchlistId> [add|rename|delete]",
+          );
+          process.exit(2);
+        }
+        const op = process.argv[4] || "add";
+        if (op === "add") {
+          send(ws, "watchlist/add_symbols", "probe-wl-add", {
+            watchlistId: wlId,
+            symbols: ["TSLA"],
+          });
+        } else if (op === "rename") {
+          send(ws, "watchlist/rename", "probe-wl-rename", {
+            watchlistId: wlId,
+            watchlistName: "ProbeWL2",
+          });
+        } else {
+          send(ws, "watchlist/delete", "probe-wl-delete", { watchlistId: wlId });
+        }
+        await sleep(4000);
+      }
+      break;
+
+    case "W5c": // 变更 watchlist 成分：变体名探测（错误帧自曝正确名字）
+      {
+        const wlId = Number(process.argv[3] || "1222638069");
+        const cases = [
+          ["watchlist/update_symbols", { watchlistId: wlId, symbols: ["AAPL", "SPY", "TSLA"] }],
+          ["watchlist/save", { watchlist: { id: wlId, name: "ProbeWL2", symbols: ["AAPL", "SPY", "TSLA"] } }],
+          ["watchlist/update", { watchlistId: wlId, symbols: { add: ["TSLA"], delete: [] } }],
+        ];
+        for (const [svc, params] of cases) {
+          send(ws, svc, `probe-${svc.replace(/\W/g, "_")}`, params);
+          await sleep(2500);
+        }
+      }
+      break;
+
+    case "W5d": // 假设：create 带 id 即覆盖保存（前端常这样实现 upsert）
+      {
+        const wlId = Number(process.argv[3]);
+        if (!wlId) {
+          console.error("usage: probe-write.mjs W5d <watchlistId>");
+          process.exit(2);
+        }
+        send(ws, "watchlist/create", "probe-wl-upsert", {
+          watchlistId: wlId,
+          watchlistName: "ProbeWL2",
+          symbols: ["AAPL", "SPY", "TSLA"],
+        });
+        await sleep(3000);
+        send(ws, "watchlist/get", "probe-wl-verify", { watchlistId: wlId });
+        await sleep(3000);
+      }
+      break;
+
+    case "W5e": // 再试成分变更候选名，最后 delete 清理
+      {
+        const wlId = Number(process.argv[3]);
+        if (!wlId) {
+          console.error("usage: probe-write.mjs W5e <watchlistId> [--cleanup]");
+          process.exit(2);
+        }
+        const cleanup = process.argv[4] === "--cleanup";
+        if (!cleanup) {
+          const cases = [
+            ["watchlist/symbols", { watchlistId: wlId, symbols: ["AAPL", "SPY", "TSLA"] }],
+            ["watchlist/edit", { watchlistId: wlId, symbols: ["AAPL", "SPY", "TSLA"] }],
+            ["watchlist/modify", { watchlistId: wlId, symbols: ["AAPL", "SPY", "TSLA"] }],
+            ["watchlist/set_symbols", { watchlistId: wlId, symbols: ["AAPL", "SPY", "TSLA"] }],
+          ];
+          for (const [svc, params] of cases) {
+            send(ws, svc, `probe2-${svc.replace(/\W/g, "_")}`, params);
+            await sleep(2500);
+          }
+        }
+        send(ws, "watchlist/delete", "probe-wl-delete", { watchlistId: wlId });
+        await sleep(3000);
+        send(ws, "watchlist/categories", "probe-wl-cat-after", { categories: ["PERSONAL"] });
+        await sleep(3000);
+      }
+      break;
+
     default:
       console.error("unknown case; use W1|W2|W3|W4|W6|W6b|W7");
       process.exit(2);
