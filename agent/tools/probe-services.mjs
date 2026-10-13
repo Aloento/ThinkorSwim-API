@@ -83,6 +83,7 @@ const PROBES = [
   { service: "margin_calls", id: "probe-margin-calls", params: {}, waitMs: 3000 },
   { service: "disclosures", id: "probe-disclosures", params: {}, waitMs: 3000 },
   { service: "message_center/get", id: "probe-msg-center", params: {}, waitMs: 3000 },
+  { service: "message_center/subscribe", id: "probe-msg-sub", params: {}, waitMs: 3000 },
   { service: "quotes", id: "probe-quotes", params: { account: "COMBINED ACCOUNT", symbols: ["AAPL", "SPY", "TSLA"], refreshRate: 1000, fields: ["MARK", "BID", "ASK", "VOLUME", "LAST", "OPEN", "HIGH", "LOW", "CLOSE", "NET_CHANGE"] }, waitMs: 6000 },
   { service: "chart", id: "probe-chart-1", params: { symbol: "AAPL", timeAggregation: "DAY", range: "MONTH1", extendedHours: false, studies: [] }, waitMs: 5000 },
   { service: "instrument_search", id: "probe-search-1", params: { pattern: "TSLA", limit: 5 }, waitMs: 3000 },
