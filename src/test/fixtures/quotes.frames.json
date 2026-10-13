@@ -1,0 +1,132 @@
+[
+ {
+  "header": {
+   "service": "quotes",
+   "id": "probe-quotes",
+   "ver": 0,
+   "type": "snapshot"
+  },
+  "body": {
+   "items": [
+    {
+     "symbol": "AAPL",
+     "isDelayed": true,
+     "values": {
+      "CLOSE": 340.97,
+      "HIGH": 348.1499,
+      "LAST": 340.964,
+      "LOW": 340.74,
+      "MARK": 340.99,
+      "NET_CHANGE": -0.006,
+      "OPEN": 344.665
+     }
+    },
+    {
+     "symbol": "SPY",
+     "isDelayed": true,
+     "values": {
+      "CLOSE": 778.1,
+      "LAST": 777.96,
+      "MARK": 778.01,
+      "NET_CHANGE": -0.14
+     }
+    },
+    {
+     "symbol": "TSLA",
+     "isDelayed": true,
+     "values": {
+      "ASK": 374.62,
+      "BID": 374.55,
+      "CLOSE": 378.03,
+      "HIGH": 377.05,
+      "LAST": 374.5,
+      "LOW": 371.3,
+      "MARK": 374.6,
+      "NET_CHANGE": -3.53,
+      "OPEN": 372.325,
+      "VOLUME": 18324688.746731
+     }
+    }
+   ]
+  }
+ },
+ {
+  "header": {
+   "service": "quotes",
+   "id": "probe-quotes",
+   "ver": 0,
+   "type": "patch"
+  },
+  "body": {
+   "patches": [
+    {
+     "op": "replace",
+     "path": "/items/2/values/VOLUME",
+     "value": 18324688.931667
+    },
+    {
+     "op": "add",
+     "path": "/items/1/values/HIGH",
+     "value": 778.75
+    },
+    {
+     "op": "add",
+     "path": "/items/1/values/LOW",
+     "value": 775.95
+    },
+    {
+     "op": "add",
+     "path": "/items/1/values/VOLUME",
+     "value": 25711384.438271
+    },
+    {
+     "op": "add",
+     "path": "/items/1/values/ASK",
+     "value": 777.99
+    },
+    {
+     "op": "add",
+     "path": "/items/1/values/BID",
+     "value": 777.94
+    },
+    {
+     "op": "add",
+     "path": "/items/1/values/OPEN",
+     "value": 777.34
+    },
+    {
+     "op": "add",
+     "path": "/items/0/values/VOLUME",
+     "value": 38911410.540155
+    },
+    {
+     "op": "add",
+     "path": "/items/0/values/ASK",
+     "value": 341
+    },
+    {
+     "op": "add",
+     "path": "/items/0/values/BID",
+     "value": 340.76
+    }
+   ]
+  }
+ },
+ {
+  "header": {
+   "service": "quotes",
+   "id": "probe-quotes",
+   "ver": 0,
+   "type": "patch"
+  },
+  "body": {
+   "patches": [
+    {
+     "op": "replace",
+     "path": "/items/2/values/VOLUME",
+     "value": 18324689.052617
+    }
+   ]
+  }
+ }
+]
