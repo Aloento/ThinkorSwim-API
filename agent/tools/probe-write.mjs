@@ -346,6 +346,28 @@ async function main() {
       }
       break;
 
+    case "W5f": // bundle 挖掘：成分修改疑似 watchlist/add + watchlist/remove
+      {
+        const wlId = Number(process.argv[3]);
+        if (!wlId) {
+          console.error("usage: probe-write.mjs W5f <watchlistId>");
+          process.exit(2);
+        }
+        const variants = [
+          ["watchlist/add", { watchlistId: wlId, symbols: ["TSLA"] }],
+          ["watchlist/add", { watchlistId: wlId, symbol: "TSLA" }],
+          ["watchlist/remove", { watchlistId: wlId, symbols: ["TSLA"] }],
+          ["watchlist/rearrange", { watchlistId: wlId, symbols: ["SPY", "AAPL"] }],
+        ];
+        for (const [svc, params] of variants) {
+          send(ws, svc, `probe3-${svc.replace(/\W/g, "_")}-${params.symbols ? "syms" : "sym"}`, params);
+          await sleep(2500);
+        }
+        send(ws, "watchlist/get", "probe-wl-verify2", { watchlistId: wlId });
+        await sleep(3000);
+      }
+      break;
+
     default:
       console.error("unknown case; use W1|W2|W3|W4|W6|W6b|W7");
       process.exit(2);

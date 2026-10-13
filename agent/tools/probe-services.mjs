@@ -108,6 +108,19 @@ const PROBES = [
   { service: "account_history", id: "probe-achist", params: { account: "COMBINED ACCOUNT", startDate: "2026-10-01", endDate: "2026-10-13", activityTypes: ["ALL"] }, waitMs: 3000 },
   { service: "tax_lots", id: "probe-taxlots", params: { account: "COMBINED ACCOUNT", symbol: "AAPL" }, waitMs: 3000 },
   { service: "order_preview", id: "probe-opreview", params: { accountCode: "D-12345678", action: "INIT", marker: "SINGLE", orders: [{ requestType: "INIT_STOCK", orderType: "LIMIT", limitPrice: 1, legs: [{ symbol: "AAPL", quantity: 1 }] }] }, waitMs: 4000 },
+  // —— bundle 挖掘 + 错误帧参数修正（第二轮）——
+  { service: "news_headers/get", id: "probe-news-headers", params: { symbol: "AAPL", limit: 5 }, waitMs: 4000 },
+  { service: "fundamentals/current", id: "probe-fund-cur", params: { symbol: "AAPL", time: "QUARTERLY", fields: ["REVENUE", "EARNINGS_PER_SHARE", "PRICE_TO_EARNINGS_RATIO"] }, waitMs: 4000 },
+  { service: "fundamentals/history", id: "probe-fund-hist", params: { symbol: "AAPL", time: "QUARTERLY", fields: ["REVENUE", "NET_INCOME"] }, waitMs: 4000 },
+  { service: "order_history", id: "probe-order-hist", params: { account: "D-12345678", startTime: Math.floor((Date.now() - 30 * 86400_000) / 1000), endTime: Math.floor(Date.now() / 1000), orderEntryFields: ["ORDER_ID", "SYMBOL", "QTY", "LIMIT_PRICE", "STATUS", "TIME_PLACED"] }, waitMs: 4000 },
+  { service: "tax_lot/get", id: "probe-taxlot-get", params: { account: "COMBINED ACCOUNT", symbol: "AAPL", taxLotFields: ["QUANTITY", "COST_PER_SHARE", "OPEN_DATE"], refreshToken: "1" }, waitMs: 4000 },
+  { service: "studies/get", id: "probe-studies", params: { studies: ["SimpleMovingAvg"] }, waitMs: 4000 },
+  { service: "user_properties/set", id: "probe-uprops-set", params: {}, waitMs: 3000 },
+  { service: "options_statistics", id: "probe-optstats", params: { symbol: "AAPL", refreshRate: 2000 }, waitMs: 5000 },
+  { service: "transactions/categories", id: "probe-txn-cats", params: { account: "COMBINED ACCOUNT" }, waitMs: 3000 },
+  { service: "quotes/options/centered", id: "probe-qcentered", params: { underlyingSymbol: "AAPL", exchange: "BEST", fields: ["BID", "ASK"], filter: { strikeQuantity: 100 } }, waitMs: 4000 },
+  { service: "disclosures/accept", id: "probe-disc-accept", params: {}, waitMs: 3000 },
+  { service: "watchlist/add", id: "probe-wl-add-absent", params: { watchlistId: 999999, symbols: ["ZZZZ"] }, waitMs: 3000 },
 ];
 
 async function main() {
