@@ -566,19 +566,19 @@ const PROBES = [
   {
     service: "news_headers/get_relevant",
     id: "probe-news-rel4",
-    params: { symbols: ["AAPL"], limit: 5, sortMode: "TIME" },
+    params: { symbols: ["AAPL"], limit: 5, sortMode: "BY_TIME" },
     waitMs: 3000,
   },
   {
     service: "study/subscribe",
     id: "probe-study-sub4",
-    params: { symbols: ["AAPL"], type: "CHART", studies: ["SimpleMovingAvg"] },
+    params: { symbols: ["AAPL"], type: "STUDY", studies: ["SimpleMovingAvg"] },
     waitMs: 3000,
   },
   {
     service: "scan_query/get",
     id: "probe-scan-q4",
-    params: { watchlistId: -2 },
+    params: { watchlistId: 100 },
     waitMs: 3000,
   },
   {
