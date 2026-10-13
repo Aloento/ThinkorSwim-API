@@ -18,6 +18,8 @@ export type OptionChainDetailsItem = {
     putDisplaySymbol: string;
   }[];
   spc: number;
+  // 实测仅 Weeklys 系列携带（probe-2026-10-13/option_chain_get.jsonl），如 "Weeklys"
+  optionClassName?: string;
   name: string;
   contract: string;
   contractDisplay: string;
@@ -25,9 +27,11 @@ export type OptionChainDetailsItem = {
   settlementType: "AM" | "PM";
 };
 
+// 实测请求形状（probe-2026-10-13/option_chain_get.jsonl 成功帧 + Lead 核对清单）：
+// {underlyingSymbol, filter: {strikeQuantity, seriesNames?}}
 export type OptionChainDetailsRequest = {
   symbol: string;
-  seriesNames: string[];
+  seriesNames?: string[];
 };
 
 export default class OptionChainDetailsMessageHandler implements WebSocketApiMessageHandler<OptionChainDetailsRequest> {
@@ -36,6 +40,8 @@ export default class OptionChainDetailsMessageHandler implements WebSocketApiMes
     symbol,
     seriesNames,
   }: OptionChainDetailsRequest): RawPayloadRequest {
+    const filter: Record<string, any> = { strikeQuantity: 2147483647 };
+    if (seriesNames !== undefined) filter.seriesNames = seriesNames;
     return {
       payload: [
         {
@@ -46,7 +52,7 @@ export default class OptionChainDetailsMessageHandler implements WebSocketApiMes
           },
           params: {
             underlyingSymbol: symbol,
-            filter: { strikeQuantity: 2147483647, seriesNames },
+            filter,
           },
         },
       ],

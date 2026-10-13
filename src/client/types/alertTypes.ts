@@ -39,12 +39,22 @@ export type RawAlertResponse = {
   expirationTime: number;
   lastTriggeredTime: number;
   status: AlertStatus;
+  // 实测两帧均含 tag: "TDA"（write-2026-10-13/W6.jsonl）
+  tag: string;
   market: {
     field: string;
     operator: string;
     exchange: string;
     threshold: number;
-    components: [{ symbol: string; assetType: string; quantity: number }];
+    // 实测请求只需 {symbol, quantity}；服务端回填 cusip/sus/assetType，
+    // 故除 symbol/quantity 外均为可选。
+    components: {
+      symbol: string;
+      quantity: number;
+      cusip?: string;
+      sus?: string;
+      assetType?: string;
+    }[];
     type: string;
   };
   lastNotificationTime: number;

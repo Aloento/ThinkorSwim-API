@@ -29,3 +29,7 @@ export * from "./client/services/messageCenterGetMessageHandler.js";
 export * from "./client/services/messageCenterSubscribeMessageHandler.js";
 export * from "./client/services/chatGlobalMessagesMessageHandler.js";
 export * from "./client/services/supportChatsMessageHandler.js";
+export * from "./client/services/watchlistCategoriesMessageHandler.js";
+export * from "./client/services/watchlistCreateMessageHandler.js";
+export * from "./client/services/watchlistRenameMessageHandler.js";
+export * from "./client/services/watchlistDeleteMessageHandler.js";

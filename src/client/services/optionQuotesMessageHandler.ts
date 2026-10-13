@@ -4,9 +4,11 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
+// 响应实测自 agent/artifacts/probe-2026-10-13/quotes_options.jsonl。
+// body 顶层为 items + exchanges；items[].symbol 形如 ".AAPL261014C245"。
 export type RawOptionQuotesSnapshotBodyResponse = {
-  exchanges: string[];
   items: OptionQuoteItem[];
+  exchanges: string[];
 };
 
 export type OptionQuoteItem = {
@@ -21,13 +23,25 @@ export type OptionQuoteItemValue = {
   OPEN_INT?: number;
   PROBABILITY_ITM?: number;
   VOLUME?: number;
+  IMPLIED_VOLATILITY?: number;
+};
+
+export type OptionQuotesFilter = {
+  seriesNames?: string[];
+  // 实测服务端校验（quotes_options.jsonl 第 1 帧 error）：
+  // "Either strikeQuantity or both minStrike and maxStrike must be specified"
+  strikeQuantity?: number;
+  minStrike?: number;
+  maxStrike?: number;
 };
 
 export type OptionQuotesRequestParams = {
   underlyingSymbol: string;
-  seriesNames: string[];
-  minStrike: number;
-  maxStrike: number;
+  // 可选，实测确认（Lead 核对清单：seriesNames 可选）
+  seriesNames?: string[];
+  minStrike?: number;
+  maxStrike?: number;
+  strikeQuantity?: number;
 };
 
 export default class OptionQuotesMessageHandler implements WebSocketApiMessageHandler<OptionQuotesRequestParams> {
@@ -36,7 +50,21 @@ export default class OptionQuotesMessageHandler implements WebSocketApiMessageHa
     seriesNames,
     minStrike,
     maxStrike,
+    strikeQuantity,
   }: OptionQuotesRequestParams): RawPayloadRequest {
+    if (
+      strikeQuantity === undefined &&
+      (minStrike === undefined || maxStrike === undefined)
+    ) {
+      throw new Error(
+        "optionQuotes filter requires either strikeQuantity or both minStrike and maxStrike",
+      );
+    }
+
+    const filter: OptionQuotesFilter = { minStrike, maxStrike };
+    if (strikeQuantity !== undefined) filter.strikeQuantity = strikeQuantity;
+    if (seriesNames !== undefined) filter.seriesNames = seriesNames;
+
     return newPayload({
       header: { service: "quotes/options", id: "quotes/options", ver: 0 },
       params: {
@@ -50,7 +78,7 @@ export default class OptionQuotesMessageHandler implements WebSocketApiMessageHa
           "OPEN_INT",
           "VOLUME",
         ],
-        filter: { seriesNames, minStrike, maxStrike },
+        filter,
       },
     });
   }
