@@ -44,9 +44,39 @@ export type ApiService =
   | "user_properties/set"
   | "disclosures/accept"
   | "transactions/categories"
-  // 以下服务名在 bundle 中确认存在但参数/响应形状未实测（agent/06 第 4 节），
-  // 暂无 handler，也未加入本联合类型；实测确认后按第三批方式补：
-  //   news_headers/subscribe、tax_lot/update、chat/create、chat/close、
-  //   chat/send_message、support_chat/messages、fundamentals/history、
-  //   quotes/get、quotes/options/centered
+  // 第四批（task-8，agent/06 §4 第二/三/五轮 + 前端 bundle 调用点核对）：
+  | "news_headers/get_relevant"
+  | "news_headers/subscribe"
+  | "news_headers/subscribe_relevant"
+  | "news_body"
+  | "fundamentals/history"
+  | "study/categories"
+  | "study/subscribe"
+  | "scan_filter/get"
+  | "scan_filter/parameters"
+  | "scan_query/get"
+  | "scan_query/save"
+  | "drawing_sets"
+  | "drawings"
+  | "drawing/create"
+  | "drawing/update"
+  | "drawing/delete"
+  | "drawing_set/create"
+  | "drawing_set/delete"
+  | "demo_account/set_balance"
+  | "demo_account/adjust_cash"
+  | "access_token/get"
+  | "auth_code/get"
+  | "tax_lot/update"
+  | "analyst_reports/token"
+  | "unsubscribe"
+  | "logoff/schwab"
+  | "quotes/get"
+  | "chat/create"
+  | "chat/close"
+  | "chat/send_message"
+  | "support_chat/messages"
+  // bundle 枚举里存在但无 handler（前端用别的服务名达成，或已证伪）：
+  //   quotes/options/centered —— 实测 "Undefined service"
+  //   （agent/artifacts/probe-2026-10-13/quotes_options_centered.jsonl）
   | "fake"; // testing only
