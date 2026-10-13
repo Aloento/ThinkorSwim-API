@@ -1,0 +1,6 @@
+allowBuilds:
+  esbuild: true
+  puppeteer: true
+  "@swc/core": true
+  "@parcel/watcher": false
+  unrs-resolver: false

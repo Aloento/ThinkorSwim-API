@@ -6,7 +6,7 @@ import { OptionQuotesRequestParams } from "../client/services/optionQuotesMessag
 import { WsJsonClient } from "../client/wsJsonClient.js";
 import MarketDepthStateUpdater from "./marketDepthStateUpdater.js";
 import { getAuthCode } from "./browserOauth.js";
-import { MarketDepthResponse } from "src/client/services/marketDepthMessageHandler.js";
+import { MarketDepthResponse } from "../client/services/marketDepthMessageHandler.js";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 const logger = debug("testapp");

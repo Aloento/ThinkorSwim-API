@@ -1,12 +1,11 @@
 {
   "compilerOptions": {
-    "baseUrl": "./",
     "outDir": "dist",
     "target": "ESNext",
     "declaration": true,
     "declarationMap": true,
-    "downlevelIteration": true,
     "esModuleInterop": true,
+    "skipLibCheck": true,
     "resolveJsonModule": true,
     "strictNullChecks": true,
     "noImplicitAny": true,

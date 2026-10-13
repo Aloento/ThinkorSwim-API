@@ -1,6 +1,5 @@
 import debug from "debug";
 import WebSocket from "isomorphic-ws";
-import { isString } from "lodash-es";
 import {
   BufferedIterator,
   deferredWrap,
@@ -96,12 +95,13 @@ export class WsJsonClientProxy implements WsJsonClient {
       socket.onopen = () => {
         logger("proxy ws connection opened");
         this.state = ChannelState.CONNECTED;
-        this.doAuthenticate(method, args).then((res) => {
-          logger("proxy ws authentication response: %O", res);
-          if (isString(res) && res.includes("NOT_AUTHORIZED")) {
+        this.doAuthenticate(method, args).then((raw) => {
+          logger("proxy ws authentication response: %O", raw);
+          const res = raw as RawLoginResponseBody | string | null;
+          if (typeof res === "string" && res.includes("NOT_AUTHORIZED")) {
             reject(res);
           } else {
-            resolve(res);
+            resolve(res as RawLoginResponseBody | null);
           }
         });
       };

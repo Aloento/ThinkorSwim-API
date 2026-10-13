@@ -1,0 +1,8 @@
+# Normalize line endings: LF in repo and working tree (prettier is eol=lf)
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary

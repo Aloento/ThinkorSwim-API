@@ -16,14 +16,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-      - name: Increase watchers
-        run: echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
+      - uses: pnpm/action-setup@v4
       - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
-          cache: "yarn"
-      - run: yarn install
-      - run: yarn run ci
-        env:
-          CI: true
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run ci
