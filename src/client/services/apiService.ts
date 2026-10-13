@@ -19,4 +19,13 @@ export type ApiService =
   | "optionSeries/quotes"
   | "market_depth"
   | "watchlist/get"
+  | "accounts"
+  | "statement"
+  | "market_hours"
+  | "margin_calls"
+  | "disclosures"
+  | "message_center/get"
+  | "message_center/subscribe"
+  | "chat_global/messages"
+  | "support_chats"
   | "fake"; // testing only
