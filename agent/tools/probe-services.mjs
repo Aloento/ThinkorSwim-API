@@ -121,6 +121,23 @@ const PROBES = [
   { service: "quotes/options/centered", id: "probe-qcentered", params: { underlyingSymbol: "AAPL", exchange: "BEST", fields: ["BID", "ASK"], filter: { strikeQuantity: 100 } }, waitMs: 4000 },
   { service: "disclosures/accept", id: "probe-disc-accept", params: {}, waitMs: 3000 },
   { service: "watchlist/add", id: "probe-wl-add-absent", params: { watchlistId: 999999, symbols: ["ZZZZ"] }, waitMs: 3000 },
+  // —— bundle 全量 slash-name 清单的剩余候选（第三轮）——
+  { service: "quotes/get", id: "probe-qget", params: { symbols: ["AAPL"], fields: ["MARK"] }, waitMs: 3000 },
+  { service: "study/categories", id: "probe-study-cats", params: {}, waitMs: 3000 },
+  { service: "study/subscribe", id: "probe-study-sub", params: {}, waitMs: 3000 },
+  { service: "news_headers/get_relevant", id: "probe-news-rel", params: { symbol: "AAPL", limit: 5 }, waitMs: 3000 },
+  { service: "scan_filter/get", id: "probe-scan-filter", params: {}, waitMs: 3000 },
+  { service: "scan_query/get", id: "probe-scan-query", params: {}, waitMs: 3000 },
+  { service: "predict/quotes/options", id: "probe-predict-q", params: {}, waitMs: 3000 },
+  { service: "analyst_reports/token", id: "probe-analyst", params: {}, waitMs: 3000 },
+  { service: "access_token/get", id: "probe-atoken", params: {}, waitMs: 3000 },
+  { service: "auth_code/get", id: "probe-acode", params: {}, waitMs: 3000 },
+  // ⚠️ logoff/schwab 存在（bundle 确认）但会终止会话，禁止加入矩阵；单独手动验证。
+  { service: "drawing/create", id: "probe-draw-create", params: {}, waitMs: 2500 },
+  { service: "drawing_set/create", id: "probe-drawset-create", params: {}, waitMs: 2500 },
+  { service: "demo_account/set_balance", id: "probe-demo-set", params: {}, waitMs: 2500 }, // 空参只验存在性
+  { service: "demo_account/adjust_cash", id: "probe-demo-adj", params: {}, waitMs: 2500 }, // 空参只验存在性
+  // ⚠️ logoff/schwab 会终止本会话——从常规矩阵移除，只允许单独手动跑
 ];
 
 async function main() {
