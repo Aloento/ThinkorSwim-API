@@ -1,6 +1,6 @@
 import debug from "debug";
 import "dotenv/config";
-import { RealWsJsonClient } from "../client/realWsJsonClient.js";
+import { PAPER_WS_URL, RealWsJsonClient } from "../client/realWsJsonClient.js";
 import { CreateAlertRequestParams } from "../client/services/createAlertMessageHandler.js";
 import { OptionQuotesRequestParams } from "../client/services/optionQuotesMessageHandler.js";
 import { WsJsonClient } from "../client/wsJsonClient.js";
@@ -148,9 +148,39 @@ class TestApp {
     const watchlist = await this.client.watchlist(watchlistId);
     logger("getWatchlist() %O", watchlist);
   }
+
+  async smoke() {
+    // agent/07 冒烟路径：getAccounts → getStatement → quotes
+    logger(" --- smoke() getAccounts ---");
+    const accounts = await this.client.getAccounts();
+    logger("getAccounts() %O", accounts);
+    const items = (accounts.body as { items?: { code: string }[] }).items ?? [];
+    const account = items[0]?.code;
+    if (account) {
+      logger(" --- smoke() getStatement(%s) ---", account);
+      const statement = await this.client.getStatement(account);
+      logger("getStatement() %O", statement);
+    }
+    await this.quotes(["AAPL"]);
+  }
 }
 
 async function run() {
+  // guest 冒烟路径（agent/07）：agent/tools/auth-guest.mjs 把
+  // TOS_GUEST_ACCESS_TOKEN（可选 TOS_GUEST_WS_URL）写入 .env.blackbox，
+  // paper token 必须连 papermoney 数据中心（agent/06 F1）。
+  const guestToken = process.env.TOS_GUEST_ACCESS_TOKEN;
+  if (guestToken) {
+    const client = new RealWsJsonClient({
+      wsUrl: process.env.TOS_GUEST_WS_URL ?? PAPER_WS_URL,
+    });
+    await client.authenticateWithAccessToken({ accessToken: guestToken });
+    const app = new TestApp(client);
+    await app.smoke();
+    client.disconnect();
+    return;
+  }
+
   const accessToken = process.env.TOS_ACCESS_TOKEN!;
   const refreshToken = process.env.TOS_REFRESH_TOKEN!;
   const username = process.env.TOS_USERNAME!;
@@ -164,7 +194,7 @@ async function run() {
     storeTokenInDotEnvFile(client.accessToken!, client.refreshToken!);
   } else {
     throw new Error(
-      "TOS_ACCESS_TOKEN or TOS_USERNAME and TOS_PASSWORD env vars must be set",
+      "TOS_GUEST_ACCESS_TOKEN or TOS_ACCESS_TOKEN or TOS_USERNAME and TOS_PASSWORD env vars must be set",
     );
   }
   const app = new TestApp(client);

@@ -10,9 +10,14 @@ import { ChannelState } from "./realWsJsonClient.js";
 import { ChartRequestParams } from "./services/chartMessageHandler.js";
 import { CreateAlertRequestParams } from "./services/createAlertMessageHandler.js";
 import { RawLoginResponseBody } from "./services/loginMessageHandler.js";
+import { MarketHoursRequestParams } from "./services/marketHoursMessageHandler.js";
 import { OptionChainDetailsRequest } from "./services/optionChainDetailsMessageHandler.js";
 import { OptionQuotesRequestParams } from "./services/optionQuotesMessageHandler.js";
 import { PlaceLimitOrderRequestParams } from "./services/placeOrderMessageHandler.js";
+import { ReplaceOrderRequestParams } from "./services/submitOrderMessageHandler.js";
+import { WatchlistCategoriesRequestParams } from "./services/watchlistCategoriesMessageHandler.js";
+import { WatchlistCreateRequestParams } from "./services/watchlistCreateMessageHandler.js";
+import { WatchlistRenameRequestParams } from "./services/watchlistRenameMessageHandler.js";
 import { ParsedPayloadResponse } from "./tdaWsJsonTypes.js";
 import { WsJsonClient } from "./wsJsonClient.js";
 
@@ -25,6 +30,7 @@ export const ALL_REQUESTS = [
   "disconnect",
   "quotes",
   "accountPositions",
+  "getPositions",
   "chart",
   "searchInstruments",
   "lookupAlerts",
@@ -33,6 +39,8 @@ export const ALL_REQUESTS = [
   "optionChainDetails",
   "optionQuotes",
   "placeOrder",
+  "confirmOrder",
+  "submitOrder",
   "replaceOrder",
   "workingOrders",
   "createAlert",
@@ -41,6 +49,17 @@ export const ALL_REQUESTS = [
   "userProperties",
   "marketDepth",
   "watchlist",
+  "getAccounts",
+  "getStatement",
+  "getMarginCalls",
+  "getMarketHours",
+  "getDisclosures",
+  "getMessageCenter",
+  "subscribeMessageCenter",
+  "getWatchlists",
+  "createWatchlist",
+  "renameWatchlist",
+  "deleteWatchlist",
 ] as const;
 type RequestType = typeof ALL_REQUESTS;
 export type Request = RequestType[number];
@@ -72,14 +91,14 @@ export class WsJsonClientProxy implements WsJsonClient {
 
   authenticateWithAccessToken(args: {
     accessToken: string;
-    refreshToken: string;
+    refreshToken?: string;
   }): Promise<RawLoginResponseBody | null> {
     return this.authenticate("authenticateWithAccessToken", args);
   }
 
   private authenticate(
     method: "authenticateWithAuthCode" | "authenticateWithAccessToken",
-    args: string | { accessToken: string; refreshToken: string },
+    args: string | { accessToken: string; refreshToken?: string },
   ): Promise<RawLoginResponseBody | null> {
     this.socket = new WebSocket(this.proxyUrl, this.options);
     this.state = ChannelState.CONNECTING;
@@ -120,7 +139,7 @@ export class WsJsonClientProxy implements WsJsonClient {
 
   private doAuthenticate(
     method: "authenticateWithAuthCode" | "authenticateWithAccessToken",
-    args: string | { accessToken: string; refreshToken: string },
+    args: string | { accessToken: string; refreshToken?: string },
   ): Promise<RawLoginResponseBody | null> {
     return this.dispatch<RawLoginResponseBody | null>(method, args).promise();
   }
@@ -130,6 +149,13 @@ export class WsJsonClientProxy implements WsJsonClient {
   ): AsyncIterable<ParsedPayloadResponse> {
     return this.dispatch<ParsedPayloadResponse>(
       "accountPositions",
+      accountNumber,
+    ).iterable();
+  }
+
+  getPositions(accountNumber: string): AsyncIterable<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "getPositions",
       accountNumber,
     ).iterable();
   }
@@ -231,17 +257,32 @@ export class WsJsonClientProxy implements WsJsonClient {
     ).promise();
   }
 
-  quotes(symbols: string[]): AsyncIterable<ParsedPayloadResponse> {
-    return this.dispatch<ParsedPayloadResponse>("quotes", symbols).iterable();
+  confirmOrder(
+    draft: PlaceLimitOrderRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "confirmOrder",
+      draft,
+    ).promise();
+  }
+
+  submitOrder(
+    draft: PlaceLimitOrderRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>("submitOrder", draft).promise();
   }
 
   replaceOrder(
-    request: Required<PlaceLimitOrderRequestParams>,
+    request: ReplaceOrderRequestParams,
   ): Promise<ParsedPayloadResponse> {
     return this.dispatch<ParsedPayloadResponse>(
       "replaceOrder",
       request,
     ).promise();
+  }
+
+  quotes(symbols: string[]): AsyncIterable<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>("quotes", symbols).iterable();
   }
 
   searchInstruments(query: string): Promise<ParsedPayloadResponse> {
@@ -258,6 +299,78 @@ export class WsJsonClientProxy implements WsJsonClient {
   watchlist(watchlistId: number): Promise<ParsedPayloadResponse> {
     return this.dispatch<ParsedPayloadResponse>(
       "watchlist",
+      watchlistId,
+    ).promise();
+  }
+
+  getAccounts(): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>("getAccounts").promise();
+  }
+
+  getStatement(account: string): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "getStatement",
+      account,
+    ).promise();
+  }
+
+  getMarginCalls(): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>("getMarginCalls").promise();
+  }
+
+  getMarketHours(
+    request: MarketHoursRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "getMarketHours",
+      request,
+    ).promise();
+  }
+
+  getDisclosures(): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>("getDisclosures").promise();
+  }
+
+  getMessageCenter(): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>("getMessageCenter").promise();
+  }
+
+  subscribeMessageCenter(): AsyncIterable<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "subscribeMessageCenter",
+    ).iterable();
+  }
+
+  getWatchlists(
+    request: WatchlistCategoriesRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "getWatchlists",
+      request,
+    ).promise();
+  }
+
+  createWatchlist(
+    request: WatchlistCreateRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "createWatchlist",
+      request,
+    ).promise();
+  }
+
+  renameWatchlist(
+    request: WatchlistRenameRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "renameWatchlist",
+      request,
+    ).promise();
+  }
+
+  deleteWatchlist(watchlistId: number): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "deleteWatchlist",
       watchlistId,
     ).promise();
   }

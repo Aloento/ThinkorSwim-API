@@ -2,9 +2,14 @@ import { CancelOrderResponse } from "./services/cancelOrderMessageHandler.js";
 import { ChartRequestParams } from "./services/chartMessageHandler.js";
 import { CreateAlertRequestParams } from "./services/createAlertMessageHandler.js";
 import { RawLoginResponseBody } from "./services/loginMessageHandler.js";
+import { MarketHoursRequestParams } from "./services/marketHoursMessageHandler.js";
 import { OptionChainDetailsRequest } from "./services/optionChainDetailsMessageHandler.js";
 import { OptionQuotesRequestParams } from "./services/optionQuotesMessageHandler.js";
 import { PlaceLimitOrderRequestParams } from "./services/placeOrderMessageHandler.js";
+import { ReplaceOrderRequestParams } from "./services/submitOrderMessageHandler.js";
+import { WatchlistCategoriesRequestParams } from "./services/watchlistCategoriesMessageHandler.js";
+import { WatchlistCreateRequestParams } from "./services/watchlistCreateMessageHandler.js";
+import { WatchlistRenameRequestParams } from "./services/watchlistRenameMessageHandler.js";
 import { ParsedPayloadResponse } from "./tdaWsJsonTypes.js";
 import { WsJsonClient } from "./wsJsonClient.js";
 
@@ -17,7 +22,7 @@ export default class MockWsJsonClient implements WsJsonClient {
 
   authenticateWithAccessToken(_: {
     accessToken: string;
-    refreshToken: string;
+    refreshToken?: string;
   }): Promise<RawLoginResponseBody | null> {
     throw new Error("Method not implemented.");
   }
@@ -27,6 +32,10 @@ export default class MockWsJsonClient implements WsJsonClient {
       service: "positions",
       body: { positions: [] },
     };
+  }
+
+  getPositions(accountNumber: string): AsyncIterable<ParsedPayloadResponse> {
+    return this.accountPositions(accountNumber);
   }
 
   cancelAlert(_: number): Promise<ParsedPayloadResponse> {
@@ -59,10 +68,8 @@ export default class MockWsJsonClient implements WsJsonClient {
     });
   }
 
-   
   disconnect(): void {}
 
-   
   ensureConnected(): void {}
 
   isConnected(): boolean {
@@ -119,6 +126,22 @@ export default class MockWsJsonClient implements WsJsonClient {
     });
   }
 
+  confirmOrder(
+    _: PlaceLimitOrderRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "place_order",
+      body: { groupType: "SINGLE", maxOrders: 1, orders: [] },
+    });
+  }
+
+  submitOrder(_: PlaceLimitOrderRequestParams): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "place_order",
+      body: { orderId: 123 },
+    });
+  }
+
   async *quotes(_: string[]): AsyncIterable<ParsedPayloadResponse> {
     return yield {
       service: "quotes",
@@ -126,9 +149,7 @@ export default class MockWsJsonClient implements WsJsonClient {
     };
   }
 
-  replaceOrder(
-    _: Required<PlaceLimitOrderRequestParams>,
-  ): Promise<ParsedPayloadResponse> {
+  replaceOrder(_: ReplaceOrderRequestParams): Promise<ParsedPayloadResponse> {
     return Promise.resolve({
       service: "order_events",
       body: {},
@@ -197,6 +218,99 @@ export default class MockWsJsonClient implements WsJsonClient {
           symbols: ["AAPL", "GOOG", "MSFT"],
         },
       },
+    });
+  }
+
+  getAccounts(): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "accounts",
+      body: { items: [] },
+    });
+  }
+
+  getStatement(_: string): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "statement",
+      body: {},
+    });
+  }
+
+  getMarginCalls(): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "margin_calls",
+      body: {},
+    });
+  }
+
+  getMarketHours(_: MarketHoursRequestParams): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "market_hours",
+      body: { schwabMarketHours: {} },
+    });
+  }
+
+  getDisclosures(): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "disclosures",
+      body: {},
+    });
+  }
+
+  getMessageCenter(): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "message_center/get",
+      body: {},
+    });
+  }
+
+  async *subscribeMessageCenter(): AsyncIterable<ParsedPayloadResponse> {
+    return yield {
+      service: "message_center/subscribe",
+      body: {},
+    };
+  }
+
+  getWatchlists(
+    _: WatchlistCategoriesRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "watchlist/categories",
+      body: { categories: [] },
+    });
+  }
+
+  createWatchlist(
+    request: WatchlistCreateRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "watchlist/create",
+      body: {
+        watchlist: {
+          id: 1,
+          name: request.watchlistName,
+          type: "STATIC",
+          symbols: request.symbols,
+        },
+      },
+    });
+  }
+
+  renameWatchlist(
+    request: WatchlistRenameRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "watchlist/rename",
+      body: {
+        watchlistId: request.watchlistId,
+        watchlistName: request.watchlistName,
+      },
+    });
+  }
+
+  deleteWatchlist(_: number): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "watchlist/delete",
+      body: {},
     });
   }
 }

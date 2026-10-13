@@ -44,12 +44,14 @@ export default class WsJsonServerProxy implements Disposable {
       }
       case "quotes":
       case "accountPositions":
+      case "getPositions":
       case "chart":
       case "lookupAlerts":
       case "optionChainQuotes":
       case "optionQuotes":
       case "workingOrders":
       case "marketDepth":
+      case "subscribeMessageCenter":
         return await this.relayIterable(msg);
       case "createAlert":
       case "cancelAlert":
@@ -61,6 +63,18 @@ export default class WsJsonServerProxy implements Disposable {
       case "optionChainDetails":
       case "replaceOrder":
       case "placeOrder":
+      case "confirmOrder":
+      case "submitOrder":
+      case "getAccounts":
+      case "getStatement":
+      case "getMarginCalls":
+      case "getMarketHours":
+      case "getDisclosures":
+      case "getMessageCenter":
+      case "getWatchlists":
+      case "createWatchlist":
+      case "renameWatchlist":
+      case "deleteWatchlist":
         return await this.relayPromise(msg);
       case "disconnect":
         return this.upstream!.disconnect();

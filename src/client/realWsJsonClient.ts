@@ -13,6 +13,7 @@ import {
   isSchwabLoginResponse,
 } from "./messageTypeHelpers.js";
 import ResponseParser from "./responseParser.js";
+import AccountsMessageHandler from "./services/accountsMessageHandler.js";
 import AlertLookupMessageHandler from "./services/alertLookupMessageHandler.js";
 import CancelAlertMessageHandler from "./services/cancelAlertMessageHandler.js";
 import CancelOrderMessageHandler from "./services/cancelOrderMessageHandler.js";
@@ -22,6 +23,7 @@ import ChartMessageHandler, {
 import CreateAlertMessageHandler, {
   CreateAlertRequestParams,
 } from "./services/createAlertMessageHandler.js";
+import DisclosuresMessageHandler from "./services/disclosuresMessageHandler.js";
 import GenericIncomingMessageHandler from "./services/genericIncomingMessageHandler.js";
 import GetWatchlistMessageHandler from "./services/getWatchlistMessageHandler.js";
 import InstrumentSearchMessageHandler from "./services/instrumentSearchMessageHandler.js";
@@ -29,7 +31,13 @@ import LoginMessageHandler, {
   RawLoginResponse,
   RawLoginResponseBody,
 } from "./services/loginMessageHandler.js";
+import MarginCallsMessageHandler from "./services/marginCallsMessageHandler.js";
 import MarketDepthMessageHandler from "./services/marketDepthMessageHandler.js";
+import MarketHoursMessageHandler, {
+  MarketHoursRequestParams,
+} from "./services/marketHoursMessageHandler.js";
+import MessageCenterGetMessageHandler from "./services/messageCenterGetMessageHandler.js";
+import MessageCenterSubscribeMessageHandler from "./services/messageCenterSubscribeMessageHandler.js";
 import OptionChainDetailsMessageHandler, {
   OptionChainDetailsRequest,
 } from "./services/optionChainDetailsMessageHandler.js";
@@ -45,14 +53,29 @@ import PlaceOrderMessageHandler, {
 import PositionsMessageHandler from "./services/positionsMessageHandler.js";
 import QuotesMessageHandler from "./services/quotesMessageHandler.js";
 import SchwabLoginMessageHandler from "./services/schwabLoginMessageHandler.js";
-import SubmitOrderMessageHandler from "./services/submitOrderMessageHandler.js";
+import StatementMessageHandler from "./services/statementMessageHandler.js";
+import SubmitOrderMessageHandler, {
+  ReplaceOrderRequestParams,
+  SubmitDraftOrderRequestParams,
+} from "./services/submitOrderMessageHandler.js";
 import SubscribeToAlertMessageHandler from "./services/subscribeToAlertMessageHandler.js";
 import UserPropertiesMessageHandler from "./services/userPropertiesMessageHandler.js";
+import WatchlistCategoriesMessageHandler, {
+  WatchlistCategoriesRequestParams,
+} from "./services/watchlistCategoriesMessageHandler.js";
+import WatchlistCreateMessageHandler, {
+  WatchlistCreateRequestParams,
+} from "./services/watchlistCreateMessageHandler.js";
+import WatchlistDeleteMessageHandler from "./services/watchlistDeleteMessageHandler.js";
+import WatchlistRenameMessageHandler, {
+  WatchlistRenameRequestParams,
+} from "./services/watchlistRenameMessageHandler.js";
 import WebSocketApiMessageHandler from "./services/webSocketApiMessageHandler.js";
 import WorkingOrdersMessageHandler from "./services/workingOrdersMessageHandler.js";
 import {
   ParsedPayloadResponse,
   RawPayloadResponse,
+  RESPONSE_TYPE,
   WebSocketApiError,
   WsJsonRawMessage,
 } from "./tdaWsJsonTypes.js";
@@ -102,6 +125,17 @@ const messageHandlers: WebSocketApiMessageHandler<never>[] = [
   new SubmitOrderMessageHandler(),
   new MarketDepthMessageHandler(),
   new GetWatchlistMessageHandler(),
+  new AccountsMessageHandler(),
+  new StatementMessageHandler(),
+  new MarketHoursMessageHandler(),
+  new MarginCallsMessageHandler(),
+  new DisclosuresMessageHandler(),
+  new MessageCenterGetMessageHandler(),
+  new MessageCenterSubscribeMessageHandler(),
+  new WatchlistCategoriesMessageHandler(),
+  new WatchlistCreateMessageHandler(),
+  new WatchlistRenameMessageHandler(),
+  new WatchlistDeleteMessageHandler(),
 ];
 
 export const DEFAULT_WS_URL =
@@ -127,6 +161,18 @@ export class RealWsJsonClient implements WsJsonClient {
     accessToken?: string;
     refreshToken?: string;
   } = {};
+  /**
+   * 等待 SUBMIT 完成帧（orderId patch / error 帧）的 waiter，key 为
+   * `<service>$<requestId>`。这些帧必须看原始 header（ver/type），不能走
+   * 已解析流（见 submitOrder 注释）。
+   */
+  private readonly pendingSubmissions = new Map<
+    string,
+    {
+      resolve: (value: ParsedPayloadResponse) => void;
+      reject: (reason: unknown) => void;
+    }
+  >();
 
   constructor(
     options: RealWsJsonClientOptions = {},
@@ -231,8 +277,12 @@ export class RealWsJsonClient implements WsJsonClient {
       } else if (isSchwabLoginResponse(message)) {
         this.handleSchwabLoginResponse(message, resolve, reject);
       } else {
-        const parsedResponse = responseParser.parseResponse(message);
-        parsedResponse?.forEach((r) => buffer.emit(r));
+        // SUBMIT 完成帧（orderId patch / error 帧）由原始拦截消费；
+        // 其余（或 payload 里混有其他条目时）走通用解析。
+        if (!this.checkPendingSubmissions(message)) {
+          const parsedResponse = responseParser.parseResponse(message);
+          parsedResponse?.forEach((r) => buffer.emit(r));
+        }
       }
     } catch (e) {
       console.warn("⚠️ Failed to process websocket frame, ignoring: ", e);
@@ -334,17 +384,11 @@ export class RealWsJsonClient implements WsJsonClient {
   async placeOrder(
     request: PlaceLimitOrderRequestParams,
   ): Promise<ParsedPayloadResponse> {
-    // 1. place order
-    await this.dispatchHandler(PlaceOrderMessageHandler, request).promise();
-    // 2. submit order
-    // noinspection ES6MissingAwait
-    return this.dispatchHandler(SubmitOrderMessageHandler, request).promise();
-  }
-
-  replaceOrder(
-    request: Required<PlaceLimitOrderRequestParams>,
-  ): Promise<ParsedPayloadResponse> {
-    return this.dispatchHandler(SubmitOrderMessageHandler, request).promise();
+    // 两步下单（W1+W2）：先 CONFIRM 草稿（ver=1），再 SUBMIT（ver=0）。
+    // 两个 handler 用同一 symbol 推导出同一草稿 id，SUBMIT 复用 CONFIRM 的
+    // id——换 id 会报 "Can not submit while prices are not available!"。
+    await this.confirmOrder(request);
+    return this.submitOrder(request);
   }
 
   workingOrders(accountNumber: string): AsyncIterable<ParsedPayloadResponse> {
@@ -369,6 +413,135 @@ export class RealWsJsonClient implements WsJsonClient {
   watchlist(watchlistId: number): Promise<ParsedPayloadResponse> {
     return this.dispatchHandler(
       GetWatchlistMessageHandler,
+      watchlistId,
+    ).promise();
+  }
+
+  // ---- 账户域（agent/07，probe-2026-10-13 实测背书）----
+  // Promise 型门面统一取首个 snapshot；error 帧经 dispatch 自动 reject。
+
+  getAccounts(): Promise<ParsedPayloadResponse> {
+    return this.dispatchHandler(AccountsMessageHandler, undefined).promise();
+  }
+
+  getStatement(account: string): Promise<ParsedPayloadResponse> {
+    return this.dispatchHandler(StatementMessageHandler, account).promise();
+  }
+
+  getPositions(accountNumber: string): AsyncIterable<ParsedPayloadResponse> {
+    return this.accountPositions(accountNumber);
+  }
+
+  getMarginCalls(): Promise<ParsedPayloadResponse> {
+    return this.dispatchHandler(MarginCallsMessageHandler, undefined).promise();
+  }
+
+  getMarketHours(
+    request: MarketHoursRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchHandler(MarketHoursMessageHandler, request).promise();
+  }
+
+  getDisclosures(): Promise<ParsedPayloadResponse> {
+    return this.dispatchHandler(DisclosuresMessageHandler, undefined).promise();
+  }
+
+  getMessageCenter(): Promise<ParsedPayloadResponse> {
+    return this.dispatchHandler(
+      MessageCenterGetMessageHandler,
+      undefined,
+    ).promise();
+  }
+
+  subscribeMessageCenter(): AsyncIterable<ParsedPayloadResponse> {
+    return this.dispatchHandler(
+      MessageCenterSubscribeMessageHandler,
+      undefined,
+    ).iterable();
+  }
+
+  // ---- 交易域（write-2026-10-13 W 组实测）----
+
+  confirmOrder(
+    draft: PlaceLimitOrderRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    // W1：CONFIRM ver=1，id=update-draft-order-<SYMBOL>，返回草稿 snapshot。
+    return this.dispatchHandler(PlaceOrderMessageHandler, draft).promise();
+  }
+
+  submitOrder(
+    draft: SubmitDraftOrderRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    // W2：SUBMIT ver=0，复用 confirmOrder 的草稿 id（两个 handler 的
+    // header.id 由同一个 symbol 推导，天然一致）。换 id 报
+    // "Can not submit while prices are not available!"。
+    //
+    // orderId 只在 SUBMIT 后的 patch（path /orders/0/orderId）里，且该帧
+    // ver=0 而 CONFIRM snapshot 存于 ver=1 的 storeKey——当前
+    // GenericIncomingMessageHandler 对无 base 的 patch 会丢弃该条目。
+    // 因此这里在 onMessage 里直接拦截原始帧（见 checkPendingSubmissions），
+    // 不经过已解析流；error 帧同样在此 reject。
+    this.ensureConnected();
+    const handler = findByTypeOrThrow(
+      messageHandlers,
+      SubmitOrderMessageHandler,
+    );
+    const request = handler.buildRequest(draft);
+    const { service: requestService, id: requestId } =
+      request.payload?.[0]?.header ?? {};
+    if (!requestService || !requestId) {
+      throwError("submitOrder: handler produced a request without service/id");
+    }
+    // 同一 symbol 的重复提交会覆盖旧 waiter——服务端草稿本来就是按 id 唯一的。
+    return new Promise<ParsedPayloadResponse>((resolve, reject) => {
+      this.pendingSubmissions.set(`${requestService}$${requestId}`, {
+        resolve,
+        reject,
+      });
+      this.sendMessage(request);
+    });
+  }
+
+  replaceOrder(
+    request: ReplaceOrderRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    // 改单（W3）：EDIT_ORDER + refOrderId，id 用 edit-order-<SYMBOL>。
+    // 复用 SubmitOrderMessageHandler——refOrderId 存在时它走改单分支。
+    return this.dispatchHandler(SubmitOrderMessageHandler, request).promise();
+  }
+
+  // ---- 自选列表（write-2026-10-13 W5 系列实测）----
+
+  getWatchlists(
+    request: WatchlistCategoriesRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchHandler(
+      WatchlistCategoriesMessageHandler,
+      request,
+    ).promise();
+  }
+
+  createWatchlist(
+    request: WatchlistCreateRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchHandler(
+      WatchlistCreateMessageHandler,
+      request,
+    ).promise();
+  }
+
+  renameWatchlist(
+    request: WatchlistRenameRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchHandler(
+      WatchlistRenameMessageHandler,
+      request,
+    ).promise();
+  }
+
+  deleteWatchlist(watchlistId: number): Promise<ParsedPayloadResponse> {
+    return this.dispatchHandler(
+      WatchlistDeleteMessageHandler,
       watchlistId,
     ).promise();
   }
@@ -415,7 +588,67 @@ export class RealWsJsonClient implements WsJsonClient {
     }) as Observable<NonNullable<ParsedPayloadResponse>>;
   }
 
-   
+  /**
+   * SUBMIT 完成帧的原始拦截（见 submitOrder）。返回 true 表示整个 payload
+   * 已被消费，不必再进通用解析（ver=0 的 patch 在通用解析里因缺少
+   * snapshot base 会被丢弃并打出误导性的告警）。
+   */
+  private checkPendingSubmissions(message: WsJsonRawMessage): boolean {
+    if (this.pendingSubmissions.size === 0) return false;
+    const payload = (message as RawPayloadResponse).payload;
+    if (!Array.isArray(payload) || payload.length === 0) return false;
+    let consumedAll = true;
+    for (const entry of payload) {
+      const header = entry?.header;
+      if (!header) return false;
+      const key = `${header.service}$${header.id}`;
+      const waiter = this.pendingSubmissions.get(key);
+      if (!waiter || header.ver !== 0) {
+        // 其他订阅者的条目（如 CONFIRM 的 ver=1 帧）走通用解析。
+        consumedAll = false;
+        continue;
+      }
+      if (header.type === RESPONSE_TYPE.ERROR) {
+        this.pendingSubmissions.delete(key);
+        const body = (entry.body ?? {}) as {
+          message?: string;
+          isTerminal?: boolean;
+        };
+        waiter.reject(
+          new WebSocketApiError(
+            body.message ?? `Order submission (id=${header.id}) failed`,
+            {
+              service: header.service,
+              requestId: header.id,
+              isTerminal: body.isTerminal,
+            },
+          ),
+        );
+      } else if (header.type === RESPONSE_TYPE.PATCH) {
+        const patches = (
+          entry.body as
+            | { patches?: { op: string; path: string; value?: unknown }[] }
+            | undefined
+        )?.patches;
+        const orderIdOp = patches?.find((op) => op.path.endsWith("/orderId"));
+        if (orderIdOp && "value" in orderIdOp) {
+          // W2 实测：orderId 经 patch /orders/0/orderId 返回。
+          this.pendingSubmissions.delete(key);
+          waiter.resolve({
+            service: header.service,
+            id: header.id,
+            body: { orderId: orderIdOp.value },
+          });
+        } else {
+          consumedAll = false;
+        }
+      } else {
+        consumedAll = false;
+      }
+    }
+    return consumedAll;
+  }
+
   private sendMessage(data: any) {
     logger("➡️\tsending %O", data);
     const msg = JSON.stringify(data);
@@ -477,6 +710,13 @@ export class RealWsJsonClient implements WsJsonClient {
   disconnect() {
     this.socket?.close();
     this.state = ChannelState.DISCONNECTED;
+    // 等待 SUBMIT 完成帧的调用方不应悬挂——连接断开时全部 reject。
+    for (const [key, waiter] of this.pendingSubmissions) {
+      this.pendingSubmissions.delete(key);
+      waiter.reject(
+        new Error("Connection closed before order submission completed."),
+      );
+    }
     // This ensures that listeners will resolve the promise cleanly from any `for await` loops
     this.buffer.end();
   }
