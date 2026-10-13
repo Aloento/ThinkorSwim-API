@@ -45,6 +45,14 @@ async function dumpInputs(page, tag) {
   }
 }
 
+async function safeText(el, fn) {
+  try {
+    return await fn(el);
+  } catch {
+    return null; // detached frame
+  }
+}
+
 const browser = await puppeteer.launch({
   headless: false,
   args: ["--no-sandbox", "--disable-setuid-sandbox", "--window-size=1200,800"],
@@ -85,48 +93,91 @@ await page.goto("https://trade.thinkorswim.com/guestpass", {
 await sleep(2000);
 await dumpInputs(page, "initial");
 
-// 简单表单填充（结构与 auth-guest 相同）
+// 简单表单填充（结构与 auth-guest 相同，全部操作防 detached frame）
 for (let round = 0; round < 6; round++) {
-  const frames = page.frames();
-  let done = false;
-  for (const f of frames) {
-    const uIn =
-      (await f.$("#loginIdInput").catch(() => null)) ||
-      (await f.$("input[type=text]:not([type=hidden])").catch(() => null));
-    if (uIn) {
-      await uIn.click();
-      await uIn.type(USER, { delay: 80 });
-      const btn = await f.$("#continueBtn").catch(() => null);
-      if (btn) await btn.click();
-      log(`[fill ${round}] user in ${f.url()}`);
-      done = true;
-      break;
-    }
-  }
-  await sleep(2500);
-  if (!done) {
-    for (const f of frames) {
-      const pw = await f.$("input[type=password]").catch(() => null);
-      if (pw) {
-        await pw.click();
-        await pw.type(PASS, { delay: 80 });
-        const btn =
-          (await f.$("#continueBtn").catch(() => null)) ||
-          (await f.$("button[type=submit]").catch(() => null));
-        if (btn) await btn.click();
-        log(`[fill ${round}] pass in ${f.url()}`);
+  try {
+    let didSomething = false;
+    for (const f of [...page.frames()]) {
+      const uIn =
+        (await safeText(f, (fr) => fr.$("#loginIdInput"))) ||
+        (await safeText(f, (fr) => fr.$("input[type=text]:not([type=hidden])")));
+      if (uIn) {
+        await safeText(uIn, (el) => el.click());
+        await safeText(uIn, (el) => el.type(USER, { delay: 80 }));
+        const btn = await safeText(f, (fr) => fr.$("#continueBtn"));
+        if (btn) await safeText(btn, (el) => el.click());
+        log(`[fill ${round}] user in ${f.url()}`);
+        didSomething = true;
         break;
       }
     }
+    await sleep(2500);
+    if (!didSomething) {
+      for (const f of [...page.frames()]) {
+        const pw = await safeText(f, (fr) => fr.$("input[type=password]"));
+        if (pw) {
+          await safeText(pw, (el) => el.click());
+          await safeText(pw, (el) => el.type(PASS, { delay: 80 }));
+          const btn =
+            (await safeText(f, (fr) => fr.$("#continueBtn"))) ||
+            (await safeText(f, (fr) => fr.$("button[type=submit]")));
+          if (btn) await safeText(btn, (el) => el.click());
+          log(`[fill ${round}] pass in ${f.url()}`);
+          break;
+        }
+      }
+    }
+  } catch (e) {
+    log(`[fill ${round}] error: ${e.message?.slice(0, 120)}`);
   }
   await dumpInputs(page, `round${round}`);
-  if (page.url().includes("/main") || page.url().includes("/trade")) break;
+  if (new URL(page.url()).pathname.startsWith("/main")) break;
   await sleep(2500);
 }
 
-// 登录后驻留 45s 观察 wsjson 流量（页面自身会建 WS）
-for (let i = 0; i < 45 && !page.url().includes("/main"); i++) await sleep(1000);
+// 登录后驻留观察：抓 localStorage/sessionStorage 中的 token 线索
+for (let i = 0; i < 45 && !new URL(page.url()).pathname.startsWith("/main"); i++)
+  await sleep(1000);
 log("url now:", page.url());
+
+for (const f of [...page.frames()]) {
+  const store = await safeText(f, async (fr) =>
+    fr.evaluate(() =>
+      Object.entries({
+        ...Object.fromEntries(
+          Object.keys(sessionStorage || {}).map((k) => [k, sessionStorage.getItem(k)]),
+        ),
+      }),
+    ).catch(() => null),
+  );
+  if (store) {
+    for (const [k, v] of Object.entries(store)) {
+      const red = String(v)
+        .replace(/([A-Za-z0-9_-]{24,})\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, (m) => m.slice(0, 20) + "…JWT")
+        .slice(0, 240);
+      log(`[sessionStorage:${f.url().slice(0, 60)}] ${k} = ${red}`);
+    }
+  }
+}
+for (const name of ["localStorage"]) {
+  const dump = await page
+    .evaluate((n) => {
+      const out = {};
+      for (let i = 0; i < window[n].length; i++) {
+        const k = window[n].key(i);
+        out[k] = String(window[n].getItem(k)).slice(0, 240);
+      }
+      return out;
+    }, name)
+    .catch(() => null);
+  if (dump)
+    for (const [k, v] of Object.entries(dump)) {
+      const red = v
+        .replace(/([A-Za-z0-9_-]{24,})\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, (m) => m.slice(0, 20) + "…JWT")
+        .replace(/"(access_token|refresh_token|token|authorization)":"[^"]{20,}"/gi, '"$1":"<TOKEN>"');
+      log(`[localStorage] ${k} = ${red.slice(0, 260)}`);
+    }
+}
 
 // 旁听 WS 帧：通过 CDP
 const cdp = await page.createCDPSession();

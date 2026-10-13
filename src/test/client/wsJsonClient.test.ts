@@ -112,7 +112,7 @@ describe("wsJsonClientTest", () => {
   it("should connect and log in successfully", async () => {
     const url = "ws://localhost:1234";
     const server = new WS(url, { jsonProtocol: true });
-    const client = new RealWsJsonClient(new WebSocket(url));
+    const client = new RealWsJsonClient({}, new WebSocket(url));
     try {
       await server.connected;
       // explicitly do not await for this promise so that we can send the server replies below
@@ -151,7 +151,7 @@ describe("wsJsonClientTest", () => {
       new GenericIncomingMessageHandler(),
     );
     const webSocket = new WebSocket(url);
-    const client = new RealWsJsonClient(webSocket, responseParser);
+    const client = new RealWsJsonClient({}, webSocket, responseParser);
     try {
       await server.connected;
       // explicitly do not await for this promise so that we can send the server replies below

@@ -102,6 +102,18 @@ const messageHandlers: WebSocketApiMessageHandler<never>[] = [
   new GetWatchlistMessageHandler(),
 ];
 
+export const DEFAULT_WS_URL =
+  "wss://thinkorswim-services.schwab.com/Services/WsJson";
+export const PAPER_WS_URL = "wss://papermoney-services.schwab.com/Services/WsJson";
+
+export type RealWsJsonClientOptions = {
+  /** 数据中心端点：真实=DEFAULT_WS_URL，模拟盘=PAPER_WS_URL（token 与 DC 绑定） */
+  wsUrl?: string;
+  /** 可选 Cookie 头（部分场景需要携带登录会话 cookie） */
+  cookie?: string;
+  userAgent?: string;
+};
+
 export class RealWsJsonClient implements WsJsonClient {
   private readonly genericHandler = new GenericIncomingMessageHandler();
   private buffer = new BufferedIterator<ParsedPayloadResponse>();
@@ -114,8 +126,9 @@ export class RealWsJsonClient implements WsJsonClient {
   } = {};
 
   constructor(
+    options: RealWsJsonClientOptions = {},
     private readonly socket = new WebSocket(
-      "wss://thinkorswim-services.schwab.com/Services/WsJson",
+      options.wsUrl ?? DEFAULT_WS_URL,
       {
         headers: {
           Pragma: "no-cache",
@@ -126,6 +139,10 @@ export class RealWsJsonClient implements WsJsonClient {
           "Sec-WebSocket-Version": "13",
           "Sec-WebSocket-Extensions":
             "permessage-deflate; client_max_window_bits",
+          ...(options.cookie ? { Cookie: options.cookie } : {}),
+          "User-Agent":
+            options.userAgent ??
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
         },
       },
     ),
@@ -145,10 +162,9 @@ export class RealWsJsonClient implements WsJsonClient {
     refreshToken,
   }: {
     accessToken: string;
-    refreshToken: string;
+    refreshToken?: string;
   }): Promise<RawLoginResponseBody | null> {
     ensure(accessToken, "access token is required");
-    ensure(refreshToken, "refresh token is required");
     this.credentials = { accessToken, refreshToken };
     return await this.handshake();
   }
