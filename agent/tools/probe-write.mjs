@@ -12,14 +12,18 @@ dotenv.config({ path: join(here, ".env.blackbox") });
 
 const TOKEN = process.env.TOS_GUEST_ACCESS_TOKEN;
 const WS_URL =
-  process.env.TOS_GUEST_WS_URL || "wss://papermoney-services.schwab.com/Services/WsJson";
+  process.env.TOS_GUEST_WS_URL ||
+  "wss://papermoney-services.schwab.com/Services/WsJson";
 if (!TOKEN) {
   console.error("missing TOS_GUEST_ACCESS_TOKEN — run auth-guest.mjs first");
   process.exit(2);
 }
 // 安全闸门
 if (!WS_URL.includes("papermoney")) {
-  console.error("SAFETY: refusing to run write probes against a non-paper endpoint: " + WS_URL);
+  console.error(
+    "SAFETY: refusing to run write probes against a non-paper endpoint: " +
+      WS_URL,
+  );
   process.exit(3);
 }
 const SYMBOL = "AAPL";
@@ -28,7 +32,12 @@ const QTY = 1;
 const ACCOUNT = "D-12345678"; // 实测 paper 账户（accounts 服务返回）
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const artDir = join(here, "..", "artifacts", "write-" + new Date().toISOString().slice(0, 10));
+const artDir = join(
+  here,
+  "..",
+  "artifacts",
+  "write-" + new Date().toISOString().slice(0, 10),
+);
 mkdirSync(artDir, { recursive: true });
 const caseName = process.argv[2] || "W1";
 const artFile = join(artDir, `${caseName}.jsonl`);
@@ -47,7 +56,13 @@ function connect() {
     const timer = setTimeout(() => reject(new Error("connect timeout")), 15000);
     let loggedIn = false;
     ws.on("open", () =>
-      ws.send(JSON.stringify({ ver: "27.*.*", fmt: "json-patches-structured", heartbeat: "2s" })),
+      ws.send(
+        JSON.stringify({
+          ver: "27.*.*",
+          fmt: "json-patches-structured",
+          heartbeat: "2s",
+        }),
+      ),
     );
     ws.on("message", (data) => {
       const msg = JSON.parse(data.toString());
@@ -59,7 +74,12 @@ function connect() {
             payload: [
               {
                 header: { service: "login", id: "login", ver: 0 },
-                params: { token: TOKEN, domain: "TOS", platform: "PROD", tag: "TOSWeb" },
+                params: {
+                  token: TOKEN,
+                  domain: "TOS",
+                  platform: "PROD",
+                  tag: "TOSWeb",
+                },
               },
             ],
           }),
@@ -109,36 +129,48 @@ async function main() {
 
   switch (caseName) {
     case "W1": // CONFIRM 草稿（不提交）
-      send(ws, "place_order", `update-draft-order-${SYMBOL}`, {
-        accountCode: ACCOUNT,
-        action: "CONFIRM",
-        marker: "SINGLE",
-        orders: [
-          {
-            requestType: "INIT_STOCK",
-            orderType: "LIMIT",
-            limitPrice: LIMIT_PRICE,
-            legs: [{ symbol: SYMBOL, quantity: QTY }],
-          },
-        ],
-      }, 1);
+      send(
+        ws,
+        "place_order",
+        `update-draft-order-${SYMBOL}`,
+        {
+          accountCode: ACCOUNT,
+          action: "CONFIRM",
+          marker: "SINGLE",
+          orders: [
+            {
+              requestType: "INIT_STOCK",
+              orderType: "LIMIT",
+              limitPrice: LIMIT_PRICE,
+              legs: [{ symbol: SYMBOL, quantity: QTY }],
+            },
+          ],
+        },
+        1,
+      );
       await sleep(6000);
       break;
 
     case "W2": // 完整下单：CONFIRM→SUBMIT，观察 order_events
-      send(ws, "place_order", `update-draft-order-${SYMBOL}`, {
-        accountCode: ACCOUNT,
-        action: "CONFIRM",
-        marker: "SINGLE",
-        orders: [
-          {
-            requestType: "INIT_STOCK",
-            orderType: "LIMIT",
-            limitPrice: LIMIT_PRICE,
-            legs: [{ symbol: SYMBOL, quantity: QTY }],
-          },
-        ],
-      }, 1);
+      send(
+        ws,
+        "place_order",
+        `update-draft-order-${SYMBOL}`,
+        {
+          accountCode: ACCOUNT,
+          action: "CONFIRM",
+          marker: "SINGLE",
+          orders: [
+            {
+              requestType: "INIT_STOCK",
+              orderType: "LIMIT",
+              limitPrice: LIMIT_PRICE,
+              legs: [{ symbol: SYMBOL, quantity: QTY }],
+            },
+          ],
+        },
+        1,
+      );
       await sleep(3500);
       // SUBMIT 必须复用 CONFIRM 的草稿 id（服务端按 service+id 关联草稿态）
       send(ws, "place_order", `update-draft-order-${SYMBOL}`, {
@@ -255,7 +287,9 @@ async function main() {
         symbols: ["AAPL", "SPY"],
       });
       await sleep(4000);
-      send(ws, "watchlist/categories", "probe-wl-cat", { categories: ["PERSONAL"] });
+      send(ws, "watchlist/categories", "probe-wl-cat", {
+        categories: ["PERSONAL"],
+      });
       await sleep(4000);
       break;
 
@@ -280,7 +314,9 @@ async function main() {
             watchlistName: "ProbeWL2",
           });
         } else {
-          send(ws, "watchlist/delete", "probe-wl-delete", { watchlistId: wlId });
+          send(ws, "watchlist/delete", "probe-wl-delete", {
+            watchlistId: wlId,
+          });
         }
         await sleep(4000);
       }
@@ -290,9 +326,24 @@ async function main() {
       {
         const wlId = Number(process.argv[3] || "1222638069");
         const cases = [
-          ["watchlist/update_symbols", { watchlistId: wlId, symbols: ["AAPL", "SPY", "TSLA"] }],
-          ["watchlist/save", { watchlist: { id: wlId, name: "ProbeWL2", symbols: ["AAPL", "SPY", "TSLA"] } }],
-          ["watchlist/update", { watchlistId: wlId, symbols: { add: ["TSLA"], delete: [] } }],
+          [
+            "watchlist/update_symbols",
+            { watchlistId: wlId, symbols: ["AAPL", "SPY", "TSLA"] },
+          ],
+          [
+            "watchlist/save",
+            {
+              watchlist: {
+                id: wlId,
+                name: "ProbeWL2",
+                symbols: ["AAPL", "SPY", "TSLA"],
+              },
+            },
+          ],
+          [
+            "watchlist/update",
+            { watchlistId: wlId, symbols: { add: ["TSLA"], delete: [] } },
+          ],
         ];
         for (const [svc, params] of cases) {
           send(ws, svc, `probe-${svc.replace(/\W/g, "_")}`, params);
@@ -329,10 +380,22 @@ async function main() {
         const cleanup = process.argv[4] === "--cleanup";
         if (!cleanup) {
           const cases = [
-            ["watchlist/symbols", { watchlistId: wlId, symbols: ["AAPL", "SPY", "TSLA"] }],
-            ["watchlist/edit", { watchlistId: wlId, symbols: ["AAPL", "SPY", "TSLA"] }],
-            ["watchlist/modify", { watchlistId: wlId, symbols: ["AAPL", "SPY", "TSLA"] }],
-            ["watchlist/set_symbols", { watchlistId: wlId, symbols: ["AAPL", "SPY", "TSLA"] }],
+            [
+              "watchlist/symbols",
+              { watchlistId: wlId, symbols: ["AAPL", "SPY", "TSLA"] },
+            ],
+            [
+              "watchlist/edit",
+              { watchlistId: wlId, symbols: ["AAPL", "SPY", "TSLA"] },
+            ],
+            [
+              "watchlist/modify",
+              { watchlistId: wlId, symbols: ["AAPL", "SPY", "TSLA"] },
+            ],
+            [
+              "watchlist/set_symbols",
+              { watchlistId: wlId, symbols: ["AAPL", "SPY", "TSLA"] },
+            ],
           ];
           for (const [svc, params] of cases) {
             send(ws, svc, `probe2-${svc.replace(/\W/g, "_")}`, params);
@@ -341,7 +404,9 @@ async function main() {
         }
         send(ws, "watchlist/delete", "probe-wl-delete", { watchlistId: wlId });
         await sleep(3000);
-        send(ws, "watchlist/categories", "probe-wl-cat-after", { categories: ["PERSONAL"] });
+        send(ws, "watchlist/categories", "probe-wl-cat-after", {
+          categories: ["PERSONAL"],
+        });
         await sleep(3000);
       }
       break;
@@ -357,10 +422,18 @@ async function main() {
           ["watchlist/add", { watchlistId: wlId, symbols: ["TSLA"] }],
           ["watchlist/add", { watchlistId: wlId, symbol: "TSLA" }],
           ["watchlist/remove", { watchlistId: wlId, symbols: ["TSLA"] }],
-          ["watchlist/rearrange", { watchlistId: wlId, symbols: ["SPY", "AAPL"] }],
+          [
+            "watchlist/rearrange",
+            { watchlistId: wlId, symbols: ["SPY", "AAPL"] },
+          ],
         ];
         for (const [svc, params] of variants) {
-          send(ws, svc, `probe3-${svc.replace(/\W/g, "_")}-${params.symbols ? "syms" : "sym"}`, params);
+          send(
+            ws,
+            svc,
+            `probe3-${svc.replace(/\W/g, "_")}-${params.symbols ? "syms" : "sym"}`,
+            params,
+          );
           await sleep(2500);
         }
         send(ws, "watchlist/get", "probe-wl-verify2", { watchlistId: wlId });

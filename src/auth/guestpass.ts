@@ -65,7 +65,8 @@ export function waitForTsmAuthorize(
       finish();
     };
     const onResponse = (res: BrowserResponse) => {
-      if (!res.url().includes(TSM_AUTHORIZE_PATH) || res.status() !== 201) return;
+      if (!res.url().includes(TSM_AUTHORIZE_PATH) || res.status() !== 201)
+        return;
       void res
         .json()
         .then((body) => {
@@ -85,7 +86,10 @@ export function waitForTsmAuthorize(
     };
     page.on("response", onResponse);
     timer = setTimeout(
-      () => settle(() => reject(new Error(`tsm/authorize 201 not seen within ${timeoutMs}ms`))),
+      () =>
+        settle(() =>
+          reject(new Error(`tsm/authorize 201 not seen within ${timeoutMs}ms`)),
+        ),
       timeoutMs,
     );
   });
@@ -101,11 +105,11 @@ export function waitForTsmAuthorize(
  * browserLike 需提供 pages()；每个 page 需提供主 frame 的 evaluate。
  * 返回 {token, tradingSystem}；找不到返回 null。
  */
-export async function harvestSessionToken(
-  browserLike: {
-    pages(): Promise<Array<BrowserPage & { evaluate?: (fn: () => unknown) => Promise<unknown> }>>;
-  },
-): Promise<{ token: string; tradingSystem?: string } | null> {
+export async function harvestSessionToken(browserLike: {
+  pages(): Promise<
+    Array<BrowserPage & { evaluate?: (fn: () => unknown) => Promise<unknown> }>
+  >;
+}): Promise<{ token: string; tradingSystem?: string } | null> {
   for (const page of await browserLike.pages()) {
     const evaluate = page.evaluate?.bind(page);
     if (!evaluate) continue;
@@ -115,7 +119,10 @@ export async function harvestSessionToken(
         tradingSystem: sessionStorage.getItem("tradingSystem"),
       }))) as { token?: string | null; tradingSystem?: string | null } | null;
       if (got?.token) {
-        return { token: got.token, tradingSystem: got.tradingSystem ?? undefined };
+        return {
+          token: got.token,
+          tradingSystem: got.tradingSystem ?? undefined,
+        };
       }
     } catch {
       // frame detached 等情况：跳过该 page

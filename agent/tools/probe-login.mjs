@@ -28,7 +28,13 @@ const log = (...a) =>
 let phase = "handshake";
 
 ws.on("open", () => {
-  ws.send(JSON.stringify({ ver: "27.*.*", fmt: "json-patches-structured", heartbeat: "2s" }));
+  ws.send(
+    JSON.stringify({
+      ver: "27.*.*",
+      fmt: "json-patches-structured",
+      heartbeat: "2s",
+    }),
+  );
 });
 ws.on("message", (data) => {
   const msg = JSON.parse(data.toString());
@@ -59,10 +65,16 @@ ws.on("message", (data) => {
     for (const item of redacted.payload || []) {
       const b = item.body || {};
       for (const k of ["token", "refreshToken"]) {
-        if (typeof b[k] === "string") b[k] = b[k].slice(0, 12) + "…len" + b[k].length;
-        if (b.accessTokenInfo && typeof b.accessTokenInfo.refreshToken === "string")
+        if (typeof b[k] === "string")
+          b[k] = b[k].slice(0, 12) + "…len" + b[k].length;
+        if (
+          b.accessTokenInfo &&
+          typeof b.accessTokenInfo.refreshToken === "string"
+        )
           b.accessTokenInfo.refreshToken =
-            b.accessTokenInfo.refreshToken.slice(0, 12) + "…len" + b.accessTokenInfo.refreshToken.length;
+            b.accessTokenInfo.refreshToken.slice(0, 12) +
+            "…len" +
+            b.accessTokenInfo.refreshToken.length;
       }
     }
   } catch {

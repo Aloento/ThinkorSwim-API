@@ -26,7 +26,9 @@ puppeteer.use(StealthPlugin());
 const USER = process.argv[2] || process.env.TOS_GUEST_USER;
 const PASS = process.argv[3] || process.env.TOS_GUEST_PASS;
 if (!USER || !PASS) {
-  console.error("usage: auth-guest.mjs <user> <pass> (or TOS_GUEST_USER/TOS_GUEST_PASS)");
+  console.error(
+    "usage: auth-guest.mjs <user> <pass> (or TOS_GUEST_USER/TOS_GUEST_PASS)",
+  );
   process.exit(2);
 }
 
@@ -42,7 +44,11 @@ const safe = async (fn) => {
 async function main() {
   const browser = await puppeteer.launch({
     headless: false,
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--window-size=1100,800"],
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--window-size=1100,800",
+    ],
     userDataDir: join(here, "..", "puppeteer-data"),
   });
   try {
@@ -52,9 +58,17 @@ async function main() {
     // 捕获 tsm/authorize 响应（里面有 wsjson 用的 authCode）
     let tsm = null;
     page.on("response", async (res) => {
-      if (!tsm && res.url().includes("/tsm/authorize") && res.status() === 201) {
+      if (
+        !tsm &&
+        res.url().includes("/tsm/authorize") &&
+        res.status() === 201
+      ) {
         tsm = await res.json().catch(() => null);
-        if (tsm) console.log("tsm/authorize 201 captured: keys=%s", Object.keys(tsm).join(","));
+        if (tsm)
+          console.log(
+            "tsm/authorize 201 captured: keys=%s",
+            Object.keys(tsm).join(","),
+          );
       }
     });
 
@@ -97,7 +111,8 @@ async function main() {
       }
       await sleep(2500);
     }
-    if (!tsm) throw new Error("tsm/authorize 201 never observed (login failed?)");
+    if (!tsm)
+      throw new Error("tsm/authorize 201 never observed (login failed?)");
 
     const clientId = tsm.clientId || "TOSGuestPassWeb";
 
@@ -123,14 +138,22 @@ async function main() {
       }
       if (!session) await sleep(1000);
     }
-    if (!session?.token) throw new Error("page did not complete wsjson login (no sessionStorage.token)");
+    if (!session?.token)
+      throw new Error(
+        "page did not complete wsjson login (no sessionStorage.token)",
+      );
 
     const tradingSystem = session.tradingSystem || "PaperMoney";
     const paper = tradingSystem === "PaperMoney";
     const wsUrl = paper
       ? "wss://papermoney-services.schwab.com/Services/WsJson"
       : "wss://thinkorswim-services.schwab.com/Services/WsJson";
-    console.log("tradingSystem=%s → %s (tokenLen=%d)", tradingSystem, wsUrl, session.token.length);
+    console.log(
+      "tradingSystem=%s → %s (tokenLen=%d)",
+      tradingSystem,
+      wsUrl,
+      session.token.length,
+    );
 
     // 实测确认：login 复用 token 无需 Cookie（v3 带全套 cookies 仍失败，
     // 失败根因是 DC 连错——paper token 必须连 papermoney-services）。
@@ -145,10 +168,19 @@ async function main() {
       },
     });
     const body = await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error("wsjson login timeout (25s)")), 25000);
+      const timer = setTimeout(
+        () => reject(new Error("wsjson login timeout (25s)")),
+        25000,
+      );
       let sent = false;
       ws.on("open", () =>
-        ws.send(JSON.stringify({ ver: "27.*.*", fmt: "json-patches-structured", heartbeat: "2s" })),
+        ws.send(
+          JSON.stringify({
+            ver: "27.*.*",
+            fmt: "json-patches-structured",
+            heartbeat: "2s",
+          }),
+        ),
       );
       ws.on("message", (data) => {
         const msg = JSON.parse(data.toString());
@@ -185,11 +217,16 @@ async function main() {
 
     const artDir = join(here, "..", "artifacts");
     mkdirSync(artDir, { recursive: true });
-    writeFileSync(join(artDir, "login-raw.json"), JSON.stringify(body, null, 2));
+    writeFileSync(
+      join(artDir, "login-raw.json"),
+      JSON.stringify(body, null, 2),
+    );
 
     const b = body.body || {};
     if (b.authenticationStatus !== "OK") {
-      throw new Error(`wsjson login rejected: ${b.message ?? body.header?.type}`);
+      throw new Error(
+        `wsjson login rejected: ${b.message ?? body.header?.type}`,
+      );
     }
     const accessToken = session.token;
     const refreshToken = undefined; // guest 会话无 refreshToken（真实账户另测）
@@ -209,11 +246,20 @@ async function main() {
       return text.trimEnd() + (text.trim() ? "\n" : "") + line + "\n";
     };
     content = setEnv(content, "TOS_GUEST_ACCESS_TOKEN", accessToken);
-    if (refreshToken) content = setEnv(content, "TOS_GUEST_REFRESH_TOKEN", refreshToken);
+    if (refreshToken)
+      content = setEnv(content, "TOS_GUEST_REFRESH_TOKEN", refreshToken);
     content = setEnv(content, "TOS_GUEST_WS_URL", wsUrl);
     content = setEnv(content, "TOS_GUEST_CLIENT_ID", clientId);
-    content = setEnv(content, "TOS_GUEST_TRADING_SYSTEM", tradingSystem || "PaperMoney");
-    content = setEnv(content, "TOS_GUEST_TOKEN_SAVED_AT", new Date().toISOString());
+    content = setEnv(
+      content,
+      "TOS_GUEST_TRADING_SYSTEM",
+      tradingSystem || "PaperMoney",
+    );
+    content = setEnv(
+      content,
+      "TOS_GUEST_TOKEN_SAVED_AT",
+      new Date().toISOString(),
+    );
     writeFileSync(envPath, content);
     console.log("saved to agent/tools/.env.blackbox");
     console.log("DONE");
@@ -223,6 +269,9 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error("FAILED:", String(e?.message || e).replace(/(code|token)[=:]\S+/gi, "$1=***"));
+  console.error(
+    "FAILED:",
+    String(e?.message || e).replace(/(code|token)[=:]\S+/gi, "$1=***"),
+  );
   process.exit(1);
 });

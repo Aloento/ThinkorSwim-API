@@ -41,7 +41,8 @@ async function dumpInputs(page, tag) {
         })),
       )
       .catch(() => []);
-    if (inputs.length) log(`[inputs:${tag}] ${frame.url()} ${JSON.stringify(inputs)}`);
+    if (inputs.length)
+      log(`[inputs:${tag}] ${frame.url()} ${JSON.stringify(inputs)}`);
   }
 }
 
@@ -66,7 +67,10 @@ page.on("request", (req) => {
   if (req.resourceType() === "websocket") {
     log("[ws-connect]", u.split("?")[0]);
   }
-  if (/oauth|auth|token|login|session/i.test(u) && !/\.(js|css|png|svg|woff)/.test(u)) {
+  if (
+    /oauth|auth|token|login|session/i.test(u) &&
+    !/\.(js|css|png|svg|woff)/.test(u)
+  ) {
     log("[http]", req.method(), u.length > 220 ? u.slice(0, 220) + "…" : u);
     const pd = req.postData();
     if (pd) log("[http-body]", pd.slice(0, 500));
@@ -78,7 +82,10 @@ page.on("response", async (res) => {
     try {
       const t = await res.text();
       const red = t
-        .replace(/("(?:access_token|refresh_token|token)"\s*:\s*")[^"]+/gi, "$1***")
+        .replace(
+          /("(?:access_token|refresh_token|token)"\s*:\s*")[^"]+/gi,
+          "$1***",
+        )
         .slice(0, 600);
       log("[http-resp]", res.status(), u.split("?")[0], red);
     } catch {
@@ -102,7 +109,9 @@ for (let round = 0; round < 6; round++) {
     for (const f of [...page.frames()]) {
       const uIn =
         (await safeText(f, (fr) => fr.$("#loginIdInput"))) ||
-        (await safeText(f, (fr) => fr.$("input[type=text]:not([type=hidden])")));
+        (await safeText(f, (fr) =>
+          fr.$("input[type=text]:not([type=hidden])"),
+        ));
       if (uIn) {
         await safeText(uIn, (el) => el.click());
         await safeText(uIn, (el) => el.type(USER, { delay: 80 }));
@@ -138,24 +147,36 @@ for (let round = 0; round < 6; round++) {
 }
 
 // 登录后驻留观察：抓 localStorage/sessionStorage 中的 token 线索
-for (let i = 0; i < 45 && !new URL(page.url()).pathname.startsWith("/main"); i++)
+for (
+  let i = 0;
+  i < 45 && !new URL(page.url()).pathname.startsWith("/main");
+  i++
+)
   await sleep(1000);
 log("url now:", page.url());
 
 for (const f of [...page.frames()]) {
   const store = await safeText(f, async (fr) =>
-    fr.evaluate(() =>
-      Object.entries({
-        ...Object.fromEntries(
-          Object.keys(sessionStorage || {}).map((k) => [k, sessionStorage.getItem(k)]),
-        ),
-      }),
-    ).catch(() => null),
+    fr
+      .evaluate(() =>
+        Object.entries({
+          ...Object.fromEntries(
+            Object.keys(sessionStorage || {}).map((k) => [
+              k,
+              sessionStorage.getItem(k),
+            ]),
+          ),
+        }),
+      )
+      .catch(() => null),
   );
   if (store) {
     for (const [k, v] of Object.entries(store)) {
       const red = String(v)
-        .replace(/([A-Za-z0-9_-]{24,})\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, (m) => m.slice(0, 20) + "…JWT")
+        .replace(
+          /([A-Za-z0-9_-]{24,})\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g,
+          (m) => m.slice(0, 20) + "…JWT",
+        )
         .slice(0, 240);
       log(`[sessionStorage:${f.url().slice(0, 60)}] ${k} = ${red}`);
     }
@@ -175,8 +196,14 @@ for (const name of ["localStorage"]) {
   if (dump)
     for (const [k, v] of Object.entries(dump)) {
       const red = v
-        .replace(/([A-Za-z0-9_-]{24,})\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, (m) => m.slice(0, 20) + "…JWT")
-        .replace(/"(access_token|refresh_token|token|authorization)":"[^"]{20,}"/gi, '"$1":"<TOKEN>"');
+        .replace(
+          /([A-Za-z0-9_-]{24,})\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g,
+          (m) => m.slice(0, 20) + "…JWT",
+        )
+        .replace(
+          /"(access_token|refresh_token|token|authorization)":"[^"]{20,}"/gi,
+          '"$1":"<TOKEN>"',
+        );
       log(`[localStorage] ${k} = ${red.slice(0, 260)}`);
     }
 }

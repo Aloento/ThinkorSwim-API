@@ -56,7 +56,11 @@ cdp.on("Network.webSocketFrameSent", (e) => {
   const red = p
     .replace(/("token"\s*:\s*")[^"]{8}[^"]*/g, "$1<REDACTED>")
     .replace(/("authCode"\s*:\s*")[^"]{8}[^"]*/g, "$1<REDACTED>");
-  log("[ws->]", url.includes("WsJson") ? "WSJSON" : url.split("/")[2], red.slice(0, 500));
+  log(
+    "[ws->]",
+    url.includes("WsJson") ? "WSJSON" : url.split("/")[2],
+    red.slice(0, 500),
+  );
 });
 cdp.on("Network.webSocketFrameReceived", (e) => {
   const p = e.response?.payloadData || "";
@@ -65,7 +69,11 @@ cdp.on("Network.webSocketFrameReceived", (e) => {
   const red = p
     .replace(/("token"\s*:\s*")[^"]{8}[^"]*/g, "$1<REDACTED>")
     .replace(/("refreshToken"\s*:\s*")[^"]{8}[^"]*/g, "$1<REDACTED>");
-  log("[ws<-]", url.includes("WsJson") ? "WSJSON" : url.split("/")[2], red.slice(0, 700));
+  log(
+    "[ws<-]",
+    url.includes("WsJson") ? "WSJSON" : url.split("/")[2],
+    red.slice(0, 700),
+  );
 });
 
 page.on("request", (req) => {
@@ -78,18 +86,32 @@ page.on("response", async (res) => {
   const u = res.url();
   if (u.includes("tsm/authorize")) {
     const t = await res.text().catch(() => "");
-    log("[tsm-resp]", res.status(), t.replace(/([A-Za-z0-9_-]{20,})/g, (m) => m.slice(0, 10) + "…L" + m.length).slice(0, 600));
+    log(
+      "[tsm-resp]",
+      res.status(),
+      t
+        .replace(
+          /([A-Za-z0-9_-]{20,})/g,
+          (m) => m.slice(0, 10) + "…L" + m.length,
+        )
+        .slice(0, 600),
+    );
   }
 });
 
 log("goto /guestpass");
-await page.goto("https://trade.thinkorswim.com/guestpass", { waitUntil: "domcontentloaded", timeout: 60000 });
+await page.goto("https://trade.thinkorswim.com/guestpass", {
+  waitUntil: "domcontentloaded",
+  timeout: 60000,
+});
 
 for (let round = 0; round < 10; round++) {
   // 用户名
   let did = false;
   for (const f of [...page.frames()]) {
-    const uIn = (await safe(() => f.$("#loginIdInput"))) || (await safe(() => f.$("input[type=text]:not([type=hidden])")));
+    const uIn =
+      (await safe(() => f.$("#loginIdInput"))) ||
+      (await safe(() => f.$("input[type=text]:not([type=hidden])")));
     if (uIn) {
       await safe(() => uIn.click());
       await safe(() => uIn.type(USER, { delay: 80 }));
@@ -107,7 +129,9 @@ for (let round = 0; round < 10; round++) {
       if (pw) {
         await safe(() => pw.click());
         await safe(() => pw.type(PASS, { delay: 80 }));
-        const btn = (await safe(() => f.$("#continueBtn"))) || (await safe(() => f.$("button[type=submit]")));
+        const btn =
+          (await safe(() => f.$("#continueBtn"))) ||
+          (await safe(() => f.$("button[type=submit]")));
         if (btn) await safe(() => btn.click());
         log(`[fill${round}] pass`);
         break;

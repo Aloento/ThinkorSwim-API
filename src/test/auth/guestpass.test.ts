@@ -55,22 +55,36 @@ describe("guestpass auth helpers", () => {
   it("ignores non-matching responses", async () => {
     const page = new FakePage();
     const { promise, cancel } = waitForTsmAuthorize(page, 5000);
-    page.emit(fakeResponse("https://example.com/other", 201, { authCode: "x" }));
     page.emit(
-      fakeResponse("https://tosweb-sm.thinkorswim.com/api/v1/tsm/authorize", 200, {
-        authCode: "wrong-status",
-      }),
+      fakeResponse("https://example.com/other", 201, { authCode: "x" }),
     );
     page.emit(
-      fakeResponse("https://tosweb-sm.thinkorswim.com/api/v1/tsm/authorize", 201, {
-        nope: true,
-      }),
+      fakeResponse(
+        "https://tosweb-sm.thinkorswim.com/api/v1/tsm/authorize",
+        200,
+        {
+          authCode: "wrong-status",
+        },
+      ),
+    );
+    page.emit(
+      fakeResponse(
+        "https://tosweb-sm.thinkorswim.com/api/v1/tsm/authorize",
+        201,
+        {
+          nope: true,
+        },
+      ),
     );
     // 最后一条才是有效帧
     page.emit(
-      fakeResponse("https://tosweb-sm.thinkorswim.com/api/v1/tsm/authorize", 201, {
-        authCode: "valid",
-      }),
+      fakeResponse(
+        "https://tosweb-sm.thinkorswim.com/api/v1/tsm/authorize",
+        201,
+        {
+          authCode: "valid",
+        },
+      ),
     );
     const creds = await promise;
     expect(creds.authCode).toBe("valid");

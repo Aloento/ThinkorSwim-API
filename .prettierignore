@@ -2,3 +2,5 @@
 build
 dist
 example/public/env.js
+# 锁文件由 pnpm 生成，不应由 prettier 管理
+pnpm-lock.yaml

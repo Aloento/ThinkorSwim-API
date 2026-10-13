@@ -24,18 +24,26 @@ describe("replay of recorded wire frames", () => {
     expect(first.id).toBe("probe-quotes");
     const items = (first.body as { items: Array<{ symbol: string }> }).items;
     expect(items.length).toBeGreaterThan(0);
-    const symbolsAfterSnapshot = items.map((i) => i.symbol).sort().join(",");
+    const symbolsAfterSnapshot = items
+      .map((i) => i.symbol)
+      .sort()
+      .join(",");
 
     // patch 帧应基于 snapshot 累积：每次解析都返回合并后的完整 body
-    let lastBody = first.body as { items: Array<{ symbol: string; values: Record<string, unknown> }> };
+    let lastBody = first.body as {
+      items: Array<{ symbol: string; values: Record<string, unknown> }>;
+    };
     for (const frame of frames.slice(1)) {
       const parsed = handler.parseResponse(wrap(frame));
       expect(parsed).toHaveLength(1);
       lastBody = parsed[0].body as typeof lastBody;
       // 合并后仍是完整文档（快照字段保留）
-      expect(lastBody.items.map((i) => i.symbol).sort().join(",")).toBe(
-        symbolsAfterSnapshot,
-      );
+      expect(
+        lastBody.items
+          .map((i) => i.symbol)
+          .sort()
+          .join(","),
+      ).toBe(symbolsAfterSnapshot);
       for (const item of lastBody.items) {
         expect(typeof item.values).toBe("object");
       }

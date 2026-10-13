@@ -1,40 +1,40 @@
 [
- {
-  "header": {
-   "service": "market_depth",
-   "id": "probe-depth-1",
-   "ver": 0,
-   "type": "snapshot"
-  },
-  "body": {
-   "askQuotes": [
-    {
-     "name": "NASDAQ",
-     "price": 340.95,
-     "size": 40,
-     "sizeDecimal": 40
+  {
+    "header": {
+      "service": "market_depth",
+      "id": "probe-depth-1",
+      "ver": 0,
+      "type": "snapshot"
     },
-    {
-     "name": "OTCBB",
-     "price": 341,
-     "size": 1560,
-     "sizeDecimal": 1560
+    "body": {
+      "askQuotes": [
+        {
+          "name": "NASDAQ",
+          "price": 340.95,
+          "size": 40,
+          "sizeDecimal": 40
+        },
+        {
+          "name": "OTCBB",
+          "price": 341,
+          "size": 1560,
+          "sizeDecimal": 1560
+        }
+      ],
+      "bidQuotes": [
+        {
+          "name": "NASDAQ",
+          "price": 340.76,
+          "size": 40,
+          "sizeDecimal": 40
+        },
+        {
+          "name": "ARCA",
+          "price": 340.71,
+          "size": 2720,
+          "sizeDecimal": 2720
+        }
+      ]
     }
-   ],
-   "bidQuotes": [
-    {
-     "name": "NASDAQ",
-     "price": 340.76,
-     "size": 40,
-     "sizeDecimal": 40
-    },
-    {
-     "name": "ARCA",
-     "price": 340.71,
-     "size": 2720,
-     "sizeDecimal": 2720
-    }
-   ]
   }
- }
 ]
