@@ -32,4 +32,21 @@ export type ApiService =
   | "message_center/subscribe"
   | "chat_global/messages"
   | "support_chats"
+  | "news_headers/get"
+  | "fundamentals/current"
+  | "studies/get"
+  | "options_statistics"
+  | "order_history"
+  | "tax_lot/get"
+  | "watchlist/add"
+  | "watchlist/remove"
+  | "watchlist/rearrange"
+  | "user_properties/set"
+  | "disclosures/accept"
+  | "transactions/categories"
+  // 以下服务名在 bundle 中确认存在但参数/响应形状未实测（agent/06 第 4 节），
+  // 暂无 handler，也未加入本联合类型；实测确认后按第三批方式补：
+  //   news_headers/subscribe、tax_lot/update、chat/create、chat/close、
+  //   chat/send_message、support_chat/messages、fundamentals/history、
+  //   quotes/get、quotes/options/centered
   | "fake"; // testing only
