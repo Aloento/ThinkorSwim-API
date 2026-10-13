@@ -9,6 +9,7 @@ import {
 import {
   isConnectionResponse,
   isLoginResponse,
+  isResponseForRequest,
   isSchwabLoginResponse,
 } from "./messageTypeHelpers.js";
 import ResponseParser from "./responseParser.js";
@@ -52,6 +53,7 @@ import WorkingOrdersMessageHandler from "./services/workingOrdersMessageHandler.
 import {
   ParsedPayloadResponse,
   RawPayloadResponse,
+  WebSocketApiError,
   WsJsonRawMessage,
 } from "./tdaWsJsonTypes.js";
 import {
@@ -104,7 +106,8 @@ const messageHandlers: WebSocketApiMessageHandler<never>[] = [
 
 export const DEFAULT_WS_URL =
   "wss://thinkorswim-services.schwab.com/Services/WsJson";
-export const PAPER_WS_URL = "wss://papermoney-services.schwab.com/Services/WsJson";
+export const PAPER_WS_URL =
+  "wss://papermoney-services.schwab.com/Services/WsJson";
 
 export type RealWsJsonClientOptions = {
   /** 数据中心端点：真实=DEFAULT_WS_URL，模拟盘=PAPER_WS_URL（token 与 DC 绑定） */
@@ -127,25 +130,22 @@ export class RealWsJsonClient implements WsJsonClient {
 
   constructor(
     options: RealWsJsonClientOptions = {},
-    private readonly socket = new WebSocket(
-      options.wsUrl ?? DEFAULT_WS_URL,
-      {
-        headers: {
-          Pragma: "no-cache",
-          Origin: "https://trade.thinkorswim.com",
-          Upgrade: "websocket",
-          "Cache-Control": "no-cache",
-          Connection: "Upgrade",
-          "Sec-WebSocket-Version": "13",
-          "Sec-WebSocket-Extensions":
-            "permessage-deflate; client_max_window_bits",
-          ...(options.cookie ? { Cookie: options.cookie } : {}),
-          "User-Agent":
-            options.userAgent ??
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
-        },
+    private readonly socket = new WebSocket(options.wsUrl ?? DEFAULT_WS_URL, {
+      headers: {
+        Pragma: "no-cache",
+        Origin: "https://trade.thinkorswim.com",
+        Upgrade: "websocket",
+        "Cache-Control": "no-cache",
+        Connection: "Upgrade",
+        "Sec-WebSocket-Version": "13",
+        "Sec-WebSocket-Extensions":
+          "permessage-deflate; client_max_window_bits",
+        ...(options.cookie ? { Cookie: options.cookie } : {}),
+        "User-Agent":
+          options.userAgent ??
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
       },
-    ),
+    }),
     private readonly responseParser = new ResponseParser(this.genericHandler),
   ) {}
 
@@ -213,19 +213,29 @@ export class RealWsJsonClient implements WsJsonClient {
     reject: (reason?: string) => void,
   ) {
     const { responseParser, buffer } = this;
-    const message = JSON.parse(data) as WsJsonRawMessage;
+    let message: WsJsonRawMessage;
+    // Isolate JSON.parse so a malformed frame cannot kill subsequent message handling.
+    try {
+      message = JSON.parse(data) as WsJsonRawMessage;
+    } catch (e) {
+      console.warn("⚠️ Received non-JSON websocket frame, ignoring: ", e);
+      return;
+    }
     logger("⬅️\treceived %O", message);
-    if (isConnectionResponse(message)) {
-      this.authenticate();
-    } else if (isLoginResponse(message)) {
-      this.handleLoginResponse(message, resolve, reject);
-    } else if (isSchwabLoginResponse(message)) {
-      this.handleSchwabLoginResponse(message, resolve, reject);
-    } else {
-      const parsedResponse = responseParser.parseResponse(message);
-      if (parsedResponse) {
-        parsedResponse.forEach((r) => buffer.emit(r));
+    // Isolate dispatch for the same reason: one bad frame must not break the stream.
+    try {
+      if (isConnectionResponse(message)) {
+        this.authenticate();
+      } else if (isLoginResponse(message)) {
+        this.handleLoginResponse(message, resolve, reject);
+      } else if (isSchwabLoginResponse(message)) {
+        this.handleSchwabLoginResponse(message, resolve, reject);
+      } else {
+        const parsedResponse = responseParser.parseResponse(message);
+        parsedResponse?.forEach((r) => buffer.emit(r));
       }
+    } catch (e) {
+      console.warn("⚠️ Failed to process websocket frame, ignoring: ", e);
     }
   }
 
@@ -379,10 +389,30 @@ export class RealWsJsonClient implements WsJsonClient {
     args: Req,
   ): Observable<NonNullable<ParsedPayloadResponse>> {
     this.ensureConnected();
-    this.sendMessage(handler.buildRequest(args));
-    return deferredWrap(() => this.iterator).filter(
-      (msg) => msg.service === handler.service,
-    ) as Observable<NonNullable<ParsedPayloadResponse>>;
+    const request = handler.buildRequest(args);
+    this.sendMessage(request);
+    // Correlate responses with this request using the header echoed by the
+    // server: the request's service name plus its id. Using the service name
+    // from the built request (instead of `handler.service`) keeps routing
+    // correct even when a handler declares a service name that differs from
+    // the one it actually sends.
+    const { service: requestService, id: requestId } =
+      request.payload?.[0]?.header ?? {};
+    return deferredWrap(() => this.iterator).filter((msg) => {
+      if (!isResponseForRequest(msg, requestService, requestId)) {
+        return false;
+      }
+      if (msg.error) {
+        // header.type === "error" entry: reject the promise (or terminate
+        // the iterable) waiting on this request instead of emitting it.
+        throw new WebSocketApiError(msg.error.message, {
+          service: msg.service,
+          requestId: msg.id,
+          isTerminal: msg.error.isTerminal,
+        });
+      }
+      return true;
+    }) as Observable<NonNullable<ParsedPayloadResponse>>;
   }
 
   // eslint-disable-line @typescript-eslint/no-explicit-any
