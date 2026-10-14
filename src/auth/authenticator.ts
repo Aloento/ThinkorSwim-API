@@ -12,6 +12,17 @@
 // 注意：不引用任何 REST 续期通道——grant_type=refresh_token 的 REST 路径未
 // 实测（src/auth/refresh.mjs 不存在），按 YAGNI 不做；wsjson 的
 // access_token/get 通道已足够。
+//
+// 真实账户端到端实测（2026-10-14，agent/tools/exp-auth-refresh.mjs）：
+// - refreshToken 只在 F2A 勾选"信任设备"时签发（login/schwab 帧
+//   accessTokenInfo.refreshToken，len≈248~268）。
+// - 续期成功：{accessExpiresIn:86400, accessToken, refreshToken}，且
+//   refreshToken 一次性轮换（链式二次续期验证通过——新 RT 立即可用，旧 RT
+//   失效）。
+// - **重要语义**：续出的 accessToken 是 EAT（855+ 字符，"S0." 前缀），供
+//   EAT 鉴权的 REST/服务使用；它**不是** wsjson login 帧的 32 字符 session
+//   token（拿它 login 报 NOT_AUTHORIZED: Invalid token (server session id)）。
+//   wsjson 会话 token 另有生命周期，到期需重新走登录（或 tsm 授权链）。
 
 import { AuthError, ParsedPayloadResponse } from "../client/tdaWsJsonTypes.js";
 import { RawPayloadResponseAccessTokenGet } from "../client/services/accessTokenGetMessageHandler.js";
@@ -130,6 +141,8 @@ export default class Authenticator {
    * 取当前有效 accessToken：未到期直通；到期且有 refreshToken → 走刷新通道
    * （成功更新内部状态并回调 onTokenRotated）；刷新失败抛 AuthError；
    * 无 refreshToken（guest）→ 直通现有 token，console.warn 一次。
+   * 注意：刷新后返回的是 EAT（见文件头实测口径），与直通时的原始 token
+   * 类型不同。
    */
   async getValidToken(): Promise<string> {
     if (!this.refreshToken) {
