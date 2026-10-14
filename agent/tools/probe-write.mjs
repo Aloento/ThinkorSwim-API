@@ -1,6 +1,8 @@
 // 模拟盘写操作黑盒测试（W 组用例）。仅连 papermoney-services；拒绝连真实端点。
-// 用法: node agent/tools/probe-write.mjs <W1|W2|W3|W4|W6|W7>
+// 用法: node agent/tools/probe-write.mjs <W1|W2|W3|W4|W6|W7|W8|W9|W9b|W10>
 // 安全闸门：数量=1、限价=$1（远离市价，绝不成交）、标的白名单 AAPL、只连 paper。
+// W8/W9/W10（第六轮 T3）：⚠️ 只发 CONFIRM(ver:1)，永不 SUBMIT——MARKET 单
+// SUBMIT 会立即成交；期权腿用 option_chain/get 的真实合约 + $0.01 深虚值。
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { appendFileSync, mkdirSync } from "node:fs";
@@ -117,6 +119,26 @@ const send = (ws, service, id, params, ver = 0) => {
   console.log(`  → ${service}/${id} ${JSON.stringify(params).slice(0, 220)}`);
   ws.send(JSON.stringify(m));
 };
+
+// 等待指定 service+id 的响应帧（W8-W10 链式探测用）。
+function waitResponse(ws, id, timeoutMs = 8000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`timeout waiting for response to ${id}`)),
+      timeoutMs,
+    );
+    const onMsg = (d) => {
+      const msg = JSON.parse(d.toString());
+      const item = msg.payload?.[0];
+      if (item?.header?.id === id && item.header.type) {
+        clearTimeout(timer);
+        ws.off("message", onMsg);
+        resolve(item);
+      }
+    };
+    ws.on("message", onMsg);
+  });
+}
 
 async function main() {
   const ws = await connect();
@@ -441,8 +463,130 @@ async function main() {
       }
       break;
 
+    case "W8": // CONFIRM MARKET（⚠️ 只 CONFIRM，绝不 SUBMIT——市价单会立即成交）
+      send(
+        ws,
+        "place_order",
+        `update-draft-order-${SYMBOL}`,
+        {
+          accountCode: ACCOUNT,
+          action: "CONFIRM",
+          marker: "SINGLE",
+          orders: [
+            {
+              requestType: "INIT_STOCK",
+              orderType: "MARKET",
+              legs: [{ symbol: SYMBOL, quantity: QTY }],
+            },
+          ],
+        },
+        1,
+      );
+      await sleep(6000);
+      break;
+
+    case "W9": // CONFIRM STOP（stopPrice 远离市价；只 CONFIRM 绝不 SUBMIT）
+      send(
+        ws,
+        "place_order",
+        `update-draft-order-${SYMBOL}`,
+        {
+          accountCode: ACCOUNT,
+          action: "CONFIRM",
+          marker: "SINGLE",
+          orders: [
+            {
+              requestType: "INIT_STOCK",
+              orderType: "STOP",
+              stopPrice: 1, // 远低于市价的买止损，即使误提交也极难触发
+              legs: [{ symbol: SYMBOL, quantity: QTY }],
+            },
+          ],
+        },
+        1,
+      );
+      await sleep(6000);
+      break;
+
+    case "W10": {
+      // CONFIRM 期权 leg：optionSeries→option_chain/get 拿真实合约代码，
+      // 再 CONFIRM 一张远月深虚值 CALL @ $0.01（只 CONFIRM 绝不 SUBMIT）。
+      send(ws, "optionSeries", "probe-optseries-w10", {
+        underlying: SYMBOL,
+      });
+      const seriesItem = await waitResponse(ws, "probe-optseries-w10");
+      const seriesName = seriesItem.body?.series?.[0]?.name;
+      if (!seriesName) {
+        console.error("W10: optionSeries returned no series");
+        process.exit(1);
+      }
+      console.log(`  [W10] seriesName=${seriesName}`);
+      send(ws, "option_chain/get", "probe-chain-w10", {
+        underlyingSymbol: SYMBOL,
+        filter: { strikeQuantity: 3, seriesNames: [seriesName] },
+      });
+      const chainItem = await waitResponse(ws, "probe-chain-w10");
+      const pairs = chainItem.body?.optionSeries?.[0]?.optionPairs ?? [];
+      const callSymbol = pairs[0]?.callSymbol;
+      if (!callSymbol) {
+        console.error("W10: option chain returned no optionPairs");
+        process.exit(1);
+      }
+      console.log(`  [W10] callSymbol=${callSymbol}`);
+      send(
+        ws,
+        "place_order",
+        `update-draft-order-${callSymbol}`,
+        {
+          accountCode: ACCOUNT,
+          action: "CONFIRM",
+          marker: "SINGLE",
+          orders: [
+            {
+              requestType: "INIT_STOCK",
+              orderType: "LIMIT",
+              limitPrice: 0.01, // 深虚值 @ 1 美分，即使误提交也几乎不可能成交
+              legs: [{ symbol: callSymbol, quantity: 1 }],
+            },
+          ],
+        },
+        1,
+      );
+      await sleep(6000);
+      break;
+    }
+
+    case "W9b": {
+      // orderType 拼写探测：types.values 枚举是 STOPLIMIT（无下划线），
+      // 验证 wire 上两种拼写哪种被接受（错误帧自曝）。
+      for (const t of ["STOP_LIMIT", "STOPLIMIT"]) {
+        send(
+          ws,
+          "place_order",
+          `update-draft-order-${SYMBOL}-${t}`,
+          {
+            accountCode: ACCOUNT,
+            action: "CONFIRM",
+            marker: "SINGLE",
+            orders: [
+              {
+                requestType: "INIT_STOCK",
+                orderType: t,
+                stopPrice: 1,
+                limitPrice: 2,
+                legs: [{ symbol: SYMBOL, quantity: QTY }],
+              },
+            ],
+          },
+          1,
+        );
+        await sleep(4000);
+      }
+      break;
+    }
+
     default:
-      console.error("unknown case; use W1|W2|W3|W4|W6|W6b|W7");
+      console.error("unknown case; use W1|W2|W3|W4|W6|W6b|W7|W8|W9|W9b|W10");
       process.exit(2);
   }
 
