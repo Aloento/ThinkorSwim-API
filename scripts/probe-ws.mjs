@@ -1,5 +1,5 @@
 // 黑盒探针：匿名连接 TOS WsJson 端点，发送协议握手，观察服务器响应。
-// 不使用任何凭据。用法: node agent/tools/probe-ws.mjs [durationMs]
+// 不使用任何凭据。用法: node scripts/probe-ws.mjs [durationMs]
 import WebSocket from "ws";
 
 const URL_ = "wss://thinkorswim-services.schwab.com/Services/WsJson";

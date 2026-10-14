@@ -1,6 +1,6 @@
 // 真实账户 Authenticator 端到端续期回归（一次性 refreshToken 轮换）。
 //
-// 关键口径（2026-10-14 真实账户实测，exp-token-scope.mjs / exp-auth-refresh.mjs）：
+// 关键口径（真实账户端到端实测）：
 // - refreshToken 只在 F2A 时勾选"信任设备"才签发（用户确认）；随后
 //   login/schwab 帧 accessTokenInfo.refreshToken 出现（CDP 抓到，len≈248~268）。
 // - access_token/get（scope="api"）成功轮换：返回 {accessExpiresIn:86400,
@@ -22,7 +22,7 @@ import { config } from "dotenv";
 const here = dirname(fileURLToPath(import.meta.url));
 config({ path: join(here, ".env.blackbox") });
 
-const { RealWsJsonClient, Authenticator } = await import("../../dist/index.js");
+const { RealWsJsonClient, Authenticator } = await import("../dist/index.js");
 
 const wsUrl = process.env.TOS_REAL_WS_URL;
 const accessToken = process.env.TOS_REAL_ACCESS_TOKEN;

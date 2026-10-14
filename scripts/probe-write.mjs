@@ -1,8 +1,9 @@
-// 模拟盘写操作黑盒测试（W 组用例）。仅连 papermoney-services；拒绝连真实端点。
-// 用法: node agent/tools/probe-write.mjs <W1|W2|W3|W4|W6|W7|W8|W9|W9b|W10>
+// 黑盒写操作用例（W 组），仅纸面账户。仅连 papermoney-services；拒绝连真实端点。
+// 用法: node scripts/probe-write.mjs <W1|W2|W3|W4|W6|W7|W8|W9|W9b|W10>
 // 安全闸门：数量=1、限价=$1（远离市价，绝不成交）、标的白名单 AAPL、只连 paper。
-// W8/W9/W10（第六轮 T3）：⚠️ 只发 CONFIRM(ver:1)，永不 SUBMIT——MARKET 单
+// W8/W9/W10：⚠️ 只发 CONFIRM(ver:1)，永不 SUBMIT——MARKET 单
 // SUBMIT 会立即成交；期权腿用 option_chain/get 的真实合约 + $0.01 深虚值。
+// 账户代码不硬编码：优先 TOS_PAPER_ACCOUNT，否则登录后从 accounts 现取 D- 开头项。
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { appendFileSync, mkdirSync } from "node:fs";
@@ -31,12 +32,11 @@ if (!WS_URL.includes("papermoney")) {
 const SYMBOL = "AAPL";
 const LIMIT_PRICE = 1; // 远离市价的买单价，永不到来
 const QTY = 1;
-const ACCOUNT = "D-12345678"; // 实测 paper 账户（accounts 服务返回）
+let ACCOUNT = process.env.TOS_PAPER_ACCOUNT || null; // 未设置则登录后从 accounts 现取
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const artDir = join(
   here,
-  "..",
   "artifacts",
   "write-" + new Date().toISOString().slice(0, 10),
 );
@@ -148,6 +148,21 @@ async function main() {
     if (!msg.heartbeat) record(msg);
   });
   await sleep(300);
+
+  // 账户代码解析：env 未提供时从 accounts 服务现取（paper 账户以 D- 开头）
+  if (!ACCOUNT) {
+    send(ws, "accounts", "fetch-account", {});
+    const r = await waitResponse(ws, "fetch-account");
+    ACCOUNT = (r.body?.items ?? [])
+      .map((a) => a.code)
+      .find((c) => c?.startsWith("D-"));
+    if (!ACCOUNT) {
+      console.error("no paper (D-) account in accounts response");
+      ws.close();
+      process.exit(2);
+    }
+    console.log(`[${caseName}] paper account from accounts: resolved ✓`);
+  }
 
   switch (caseName) {
     case "W1": // CONFIRM 草稿（不提交）

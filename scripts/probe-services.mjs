@@ -1,6 +1,8 @@
 // 黑盒服务普查 runner：登录 paper 会话后逐个请求服务并录制原始帧。
-// 用法: node agent/tools/probe-services.mjs [service ...]   # 不传参数=全量
-// 依赖 agent/tools/.env.blackbox 里的 TOS_GUEST_ACCESS_TOKEN / TOS_GUEST_WS_URL
+// 用法: node scripts/probe-services.mjs [service ...]   # 不传参数=全量
+// 依赖 scripts/.env.blackbox 里的 TOS_GUEST_ACCESS_TOKEN / TOS_GUEST_WS_URL
+// 需要具体账户代码的用例读 TOS_PAPER_ACCOUNT（缺省退 "COMBINED ACCOUNT" 占位，
+// 该组用例可能收到校验错误帧——探针本就录制错误帧，不影响其余用例）。
 import { mkdirSync, writeFileSync, appendFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -23,7 +25,6 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const now = () => new Date().toISOString().slice(11, 19);
 const artDir = join(
   here,
-  "..",
   "artifacts",
   "probe-" + new Date().toISOString().slice(0, 10),
 );
@@ -362,7 +363,7 @@ const PROBES = [
     service: "order_preview",
     id: "probe-opreview",
     params: {
-      accountCode: "D-12345678",
+      accountCode: "COMBINED ACCOUNT",
       action: "INIT",
       marker: "SINGLE",
       orders: [
@@ -407,7 +408,7 @@ const PROBES = [
     service: "order_history",
     id: "probe-order-hist",
     params: {
-      account: "D-12345678",
+      account: "COMBINED ACCOUNT",
       startTime: Math.floor((Date.now() - 30 * 86400_000) / 1000),
       endTime: Math.floor(Date.now() / 1000),
       orderEntryFields: [

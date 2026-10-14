@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 config({ path: join(here, ".env.blackbox") });
 
-const { RealWsJsonClient, PAPER_WS_URL } = await import("../../dist/index.js");
+const { RealWsJsonClient, PAPER_WS_URL } = await import("../dist/index.js");
 
 const token = process.env.TOS_GUEST_ACCESS_TOKEN;
 if (!token) {
@@ -16,11 +16,22 @@ if (!token) {
   process.exit(2);
 }
 
-const ACCOUNT_CODE = "D-12345678";
-
 const client = new RealWsJsonClient({ wsUrl: PAPER_WS_URL });
 await client.authenticateWithAccessToken({ accessToken: token });
 console.log("[order] logged in");
+
+// 账户代码不硬编码：优先 env，否则从 accounts 会话现取（paper 账户以 D- 开头）
+const accounts = await client.getAccounts();
+const ACCOUNT_CODE =
+  process.env.TOS_PAPER_ACCOUNT ||
+  accounts.body.items?.find((a) => a.code?.startsWith("D-"))?.code;
+if (!ACCOUNT_CODE) {
+  console.error(
+    "no paper account code: set TOS_PAPER_ACCOUNT or check accounts response",
+  );
+  client.disconnect();
+  process.exit(2);
+}
 
 console.log("[order] placing limit BUY 1 x AAPL @ $1 …");
 let placed;

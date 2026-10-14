@@ -10,7 +10,7 @@
 //     → login/schwab {authCode: Y, clientId, redirectUri, tag:"TOSWeb"}
 //     → snapshot {authenticationStatus:"OK", token, accessTokenInfo.refreshToken, …}
 // 之后可用 token 走 login 复用会话。
-// 用法: node agent/tools/auth-guest.mjs [user] [pass]
+// 用法: node scripts/auth-guest.mjs [user] [pass]
 import { mkdirSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -49,7 +49,7 @@ async function main() {
       "--disable-setuid-sandbox",
       "--window-size=1100,800",
     ],
-    userDataDir: join(here, "..", "puppeteer-data"),
+    userDataDir: join(here, "puppeteer-data"),
   });
   try {
     const page = await browser.newPage();
@@ -215,11 +215,21 @@ async function main() {
       });
     });
 
-    const artDir = join(here, "..", "artifacts");
+    const artDir = join(here, "artifacts");
     mkdirSync(artDir, { recursive: true });
+    // 证据落盘但不落敏感值：token/refreshToken 一律替换为长度占位
+    const redacted = JSON.parse(JSON.stringify(body));
+    for (const k of ["token", "refreshToken"]) {
+      const v = redacted.body?.[k];
+      if (typeof v === "string")
+        redacted.body[k] = `<len ${v.length}>`;
+    }
+    if (typeof redacted.body?.accessTokenInfo?.refreshToken === "string")
+      redacted.body.accessTokenInfo.refreshToken =
+        `<len ${redacted.body.accessTokenInfo.refreshToken.length}>`;
     writeFileSync(
       join(artDir, "login-raw.json"),
-      JSON.stringify(body, null, 2),
+      JSON.stringify(redacted, null, 2),
     );
 
     const b = body.body || {};
@@ -261,7 +271,7 @@ async function main() {
       new Date().toISOString(),
     );
     writeFileSync(envPath, content);
-    console.log("saved to agent/tools/.env.blackbox");
+    console.log("saved to scripts/.env.blackbox");
     console.log("DONE");
   } finally {
     await browser.close().catch(() => {});

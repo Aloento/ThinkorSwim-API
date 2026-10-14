@@ -1,4 +1,4 @@
-// 真实账户只读功能核对（Round-2 目标："核对所有 API 功能"）。
+// 真实账户只读功能核对：32 项只读服务全量回归。
 // ⚠️ 绝不发送任何写操作：不下单/不改自选/不删/不 logoff/不动 demo——全部只读服务。
 // 前置：auth-real.mjs 成功（.env.blackbox 有 TOS_REAL_ACCESS_TOKEN/TOS_REAL_WS_URL）。
 // 重点：guest 标 🔧 的服务在真实账户下应拿到成功帧（news_relevant/study_subscribe/
@@ -19,7 +19,7 @@ if (!token || !wsUrl) {
   process.exit(2);
 }
 
-const { RealWsJsonClient } = await import("../../dist/index.js");
+const { RealWsJsonClient } = await import("../dist/index.js");
 const client = new RealWsJsonClient({ wsUrl });
 
 let pass = 0;

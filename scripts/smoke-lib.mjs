@@ -1,5 +1,5 @@
 // 端到端冒烟：用编译后的库 API（RealWsJsonClient）跑 guest paper 会话。
-// 前置：pnpm build 且 agent/tools/.env.blackbox 有 TOS_GUEST_ACCESS_TOKEN（过期则先跑 auth-guest.mjs）。
+// 前置：pnpm build 且 scripts/.env.blackbox 有 TOS_GUEST_ACCESS_TOKEN（过期则先跑 auth-guest.mjs）。
 // 验证门面方法在真实服务器上的行为：login→accounts→statement→market_hours→quotes→watchlist→第四批(study/scan/quotes/get)→第五批(news/fundamentals/order_history)。
 import { config } from "dotenv";
 import { dirname, join } from "node:path";
@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 config({ path: join(here, ".env.blackbox") });
 
-const { RealWsJsonClient, PAPER_WS_URL } = await import("../../dist/index.js");
+const { RealWsJsonClient, PAPER_WS_URL } = await import("../dist/index.js");
 
 const token = process.env.TOS_GUEST_ACCESS_TOKEN;
 if (!token) {
@@ -30,6 +30,10 @@ console.log(
   "[smoke] accounts:",
   accounts.body.items?.map((a) => a.code).join(","),
 );
+// 账户代码不硬编码：优先 env，否则从会话现取（paper 账户以 D- 开头）
+const ACCOUNT =
+  process.env.TOS_PAPER_ACCOUNT ||
+  accounts.body.items?.find((a) => a.code?.startsWith("D-"))?.code;
 
 const statement = await client.getStatement("COMBINED ACCOUNT");
 console.log("[smoke] statement NET_LIQ:", statement.body.values?.NET_LIQ);
@@ -72,8 +76,7 @@ if (wl) {
 }
 
 // watchlist 成分写闭环：create → add → remove → rearrange → delete
-// （写用例实测见 agent/artifacts/write-2026-10-13/W5f.jsonl；watchlistId
-// 必须用 create 响应返回的真实 id）。
+// （watchlistId 必须用 create 响应返回的真实 id）。
 const wlName = `SmokeWL-${Date.now()}`;
 const created = await client.createWatchlist({
   watchlistName: wlName,
@@ -167,7 +170,7 @@ if (!fundamentals.body.values) {
 }
 
 // fundamentals/history：无 time 参数；只收 21 个 historical 字段
-// （agent/artifacts/fund-hist-findings.md，guest 实测 snapshot）
+// （guest 实测 snapshot 确认）
 const hist = await client.getFundamentalsHistory({
   symbol: "AAPL",
   fields: ["EARNINGS_PER_SHARE_TTM"],
@@ -185,7 +188,7 @@ if (!histSeries || Object.keys(histSeries).length === 0) {
 // order_history：epoch 秒，窗口 ≤370 天（用近 90 天；paper 账户实测 code）
 const nowSec = Math.floor(Date.now() / 1000);
 const history = await client.getOrderHistory({
-  account: "D-12345678",
+  account: ACCOUNT,
   startTime: nowSec - 90 * 24 * 3600,
   endTime: nowSec,
   orderEntryFields: ["ORDER_ID", "SYMBOL", "STATUS", "TIME_PLACED"],
@@ -212,7 +215,7 @@ const firstFrame = async (iterable, ms) => {
 };
 
 const oe = await firstFrame(
-  client.orderEvents({ account: "D-12345678" }),
+  client.orderEvents({ account: ACCOUNT }),
   6000,
 );
 console.log(

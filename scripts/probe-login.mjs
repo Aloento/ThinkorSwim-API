@@ -1,5 +1,5 @@
 // 裸协议探针：用 authCode 走 login/schwab，dump 完整原始响应 JSON。
-// 用法: node agent/tools/probe-login.mjs <authCode>
+// 用法: node scripts/probe-login.mjs <authCode>
 // authCode 是一次性的，须新鲜。
 import WebSocket from "ws";
 

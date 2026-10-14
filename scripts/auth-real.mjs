@@ -1,12 +1,12 @@
 // 真实账户登录工具 v2（默认无头：F2A 渠道自动选择——优先"Send a mobile
 // notification"手机上点批准，页面自己轮询；无该渠道退回"Text Message"，
 // 验证码在终端回传；自动勾选"信任设备"以签发 refreshToken）。
-// 协议同 auth-guest.mjs（agent/02 §认证链路）：
+// 协议同 auth-guest.mjs（docs/TECHNICAL.md §认证链路）：
 //   1. https://trade.thinkorswim.com/ 账密登录（sws-gateway），随后 F2A
 //   2. 前端 tsm/authorize → wsjson login/schwab
 //   3. 收割 sessionStorage.token + login/schwab 响应里的 accessTokenInfo
 //      （真实账户应含 refreshToken——Authenticator 端到端回归的关键证据）
-// 用法: node agent/tools/auth-real.mjs [--headed]
+// 用法: node scripts/auth-real.mjs [--headed]
 //   默认无头（Chrome new headless，实测与有头指纹逐信号一致，stealth 抹平
 //   webdriver/UA 后即与历史成功登录同指纹，不做手写覆盖）；--headed 回退有头
 //   人工模式（v1 行为：弹窗后全人工完成 F2A）。
@@ -51,9 +51,27 @@ const safe = async (fn) => {
   }
 };
 
-const artDir = join(here, "..", "artifacts");
+const artDir = join(here, "artifacts");
 mkdirSync(artDir, { recursive: true });
-const captured = []; // 全部 login/authorize 相关响应（脱敏前原样存档）
+const captured = []; // login/authorize 相关响应（落盘前统一脱敏）
+// 脱敏：任何敏感键只留长度占位，值一律不落盘（artifacts 虽 gitignore，
+// 仍按"仓库工作区零敏感明文"纪律处理）
+const SENSITIVE_KEYS =
+  /^(token|authCode|code|eat|refreshToken|accessToken|password|passwd|newT)$/i;
+function redact(node) {
+  if (Array.isArray(node)) return node.map(redact);
+  if (node && typeof node === "object") {
+    const out = {};
+    for (const [k, v] of Object.entries(node)) {
+      out[k] =
+        typeof v === "string" && SENSITIVE_KEYS.test(k)
+          ? `<len ${v.length}>`
+          : redact(v);
+    }
+    return out;
+  }
+  return node;
+}
 let pageRefreshToken = null; // 页面 login/schwab 帧里的 accessTokenInfo.refreshToken
 let rl = null; // readline（终端回传短信码用，延迟创建；finally 统一关）
 
@@ -68,7 +86,7 @@ async function main() {
       "--disable-setuid-sandbox",
       "--window-size=1280,900",
     ],
-    userDataDir: join(here, "..", "puppeteer-data-real"),
+    userDataDir: join(here, "puppeteer-data-real"),
   });
   try {
     const page = await browser.newPage();
@@ -82,7 +100,15 @@ async function main() {
           const ct = res.headers()["content-type"] || "";
           if (ct.includes("json")) {
             const j = await res.json().catch(() => null);
-            if (j) captured.push({ url: u, status: res.status(), body: j });
+            if (j)
+              captured.push({
+                url: u.replace(
+                  /([?&](code|token|authCode)=)[^&]*/gi,
+                  "$1<scrubbed>",
+                ),
+                status: res.status(),
+                body: j,
+              });
           }
         }
       } catch {
@@ -450,11 +476,11 @@ async function main() {
 
     writeFileSync(
       join(artDir, "login-real.json"),
-      JSON.stringify(body, null, 2),
+      JSON.stringify(redact(body), null, 2),
     );
     writeFileSync(
       join(artDir, "login-real-responses.json"),
-      JSON.stringify(captured, null, 2),
+      JSON.stringify(redact(captured), null, 2),
     );
 
     const b = body.body || {};
@@ -493,7 +519,7 @@ async function main() {
       new Date().toISOString(),
     );
     writeFileSync(envPath, content);
-    console.log("saved to agent/tools/.env.blackbox (TOS_REAL_*)");
+    console.log("saved to scripts/.env.blackbox (TOS_REAL_*)");
     console.log("DONE");
   } finally {
     rl?.close();
