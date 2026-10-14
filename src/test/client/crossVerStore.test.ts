@@ -14,7 +14,7 @@ import {
 } from "../../client/tdaWsJsonTypes";
 
 /**
- * task-16：storeKey-ver 缺陷根治（06 §已知缺陷）。
+ * task-16：storeKey-ver 缺陷根治（docs/TECHNICAL.md §3.3 基底跨 ver）。
  *
  * 线上模式（W2 实测）：CONFIRM snapshot ver:1（id=update-draft-order-<SYM>）
  * → 价格 patch ver:1 → SUBMIT patch **ver:0 同 id**（orderId 在

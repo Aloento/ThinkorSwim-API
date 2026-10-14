@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 字段实测自 本地录制（scripts/probe-services.mjs 可复现）（type: snapshot）。
+// 字段实测自 本地录制（type: snapshot）。
 // 账户摘要数值，随账户类型不同字段可能有增减，故均为可选。
 export type StatementValues = {
   NET_LIQ?: number;

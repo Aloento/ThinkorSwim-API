@@ -19,7 +19,7 @@ export default class GenericIncomingMessageHandler {
   /**
    * task-16：基底按 **service+id** 命中，与 ver 无关。
    *
-   * 线上语义（06 §3，W1/W2 实测）：同一 service+id 是**同一逻辑文档的演进**，
+   * 线上语义（W1/W2 实测）：同一 service+id 是**同一逻辑文档的演进**，
    * ver 只是文档版本号——place_order 草稿 snapshot 是 ver:1，而 SUBMIT 完成
    * patch 是 **ver:0 同 id**。旧实现按 `service_id_ver` 查基底，跨 ver patch
    * 找不到基底 → fast-json-patch 在 `{}` 上应用（remove 不存在的 path 会

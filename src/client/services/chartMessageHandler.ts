@@ -18,7 +18,7 @@ export type RawPayloadResponseChart = {
   symbol: string;
 };
 
-// 服务端可用参数集合（实测自 本地录制（scripts/probe-services.mjs 可复现） 错误帧）：
+// 服务端可用参数集合（实测自 本地录制 错误帧）：
 // [priceType, timeAggregation, extendedHours, studies, symbol,
 //  startAtMarketOpen, range, cryptoMidnightUtc, tickAggregation, refreshRate]
 // 发送未知参数名会导致整条请求报 error。

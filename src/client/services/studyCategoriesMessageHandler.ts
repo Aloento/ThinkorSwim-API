@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 成功帧实测自 本地录制（scripts/probe-services.mjs 可复现）
+// 成功帧实测自 本地录制
 // （type: snapshot）：categories[]{name, studies[]}——26 个分类、441 个研究
 // 指标全清单（chart 研究功能的服务端目录）。零参数（params {}）。
 export type StudyCategoryItem = {

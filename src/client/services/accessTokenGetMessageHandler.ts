@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 必填校验抄自 本地录制（scripts/probe-services.mjs 可复现）：
+// 必填校验抄自 本地录制：
 // "$.params.refreshToken: must not be null; $.params.scope: must not be
 // null; $.params.clientId: must not be null"。guest 无 refreshToken，成功
 // 帧未实测。
@@ -22,7 +22,7 @@ export type AccessTokenGetRequestParams = {
   clientId: string;
 };
 
-// 响应形状抄自 bundle 校验 schema（本地录制（scripts/probe-services.mjs 可复现） 中
+// 响应形状抄自 bundle 校验 schema（本地录制 中
 // access_token/get 的响应 schema：{accessExpiresIn, accessToken,
 // refreshToken}）。
 export type RawPayloadResponseAccessTokenGet = {

@@ -5,7 +5,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 参数实测自前端 bundle（本地录制（scripts/probe-services.mjs 可复现））调用点：
+// 参数实测自前端 bundle（本地录制）调用点：
 //   {header:{service:"news_headers/subscribe",id:r,ver:0},params:{symbol:t}}
 // 响应处理与 news_headers/get 共用（bundle 中同一回调消费 news[]）。
 export type NewsHeadersSubscribeRequestParams = {

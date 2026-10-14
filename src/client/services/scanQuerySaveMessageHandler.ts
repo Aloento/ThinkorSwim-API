@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 参数逐字抄自前端 bundle（本地录制（scripts/probe-services.mjs 可复现））调用点：
+// 参数逐字抄自前端 bundle（本地录制）调用点：
 //   params:{queryName, watchlistType, allGroupFilters, noneGroupFilters,
 //           anyGroupFilters, filterMode, scanInWatchlist, limit(默认 1000), sort}
 // 响应形状 guest 不可达（screener 权限受限，docs/TECHNICAL.md 第五轮），线上帧未实测。

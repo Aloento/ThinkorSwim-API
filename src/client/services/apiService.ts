@@ -78,5 +78,5 @@ export type ApiService =
   | "support_chat/messages"
   // bundle 枚举里存在但无 handler（前端用别的服务名达成，或已证伪）：
   //   quotes/options/centered —— 实测 "Undefined service"
-  //   （本地录制（scripts/probe-services.mjs 可复现））
+  //   （本地录制）
   | "fake"; // testing only

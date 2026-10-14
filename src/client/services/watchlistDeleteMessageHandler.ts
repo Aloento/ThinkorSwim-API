@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 实测自 本地录制（scripts/probe-services.mjs 可复现） 第 5 帧：删除成功时 body 为空对象。
+// 实测自 本地录制 第 5 帧：删除成功时 body 为空对象。
 export type RawPayloadResponseWatchlistDelete = Record<string, unknown>;
 
 // 删除 watchlist。

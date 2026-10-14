@@ -970,7 +970,7 @@ export class RealWsJsonClient implements WsJsonClient {
    * alerts/subscribe 告警事件流（task-14B，03 A4 复开口）：handler 早已
    * 存在但只注册未派发（audit-coverage v2 证伪了"已接入"的记载）。
    * alertTypes 缺省 DEFAULT_ALERT_TYPES（CHANGED/TRIGGERED/EXPIRED/
-   * MULTIPLE_EXPIRED），实测帧见 本地录制（scripts/probe-services.mjs 可复现）。
+   * MULTIPLE_EXPIRED），实测帧见 本地录制。
    */
   subscribeAlerts(
     alertTypes: string[] = DEFAULT_ALERT_TYPES,
@@ -1450,7 +1450,7 @@ export class RealWsJsonClient implements WsJsonClient {
 
   // ---- 第五批门面（docs/TECHNICAL.md §第五批接入契约，task-13）----
   // Promise 型走 dispatchOneShot；持续推送流走 dispatchHandler（重放语义
-  // 同第四批）。options_statistics 为 snapshot+patch 流（06 §4 实测），
+  // 同第四批）。options_statistics 为 snapshot+patch 流（线上实测），
   // 按契约以 AsyncIterable 消费。
 
   /** news_headers/get：新闻标题（单次 snapshot，实测参数 [symbol, limit]） */
@@ -1472,7 +1472,7 @@ export class RealWsJsonClient implements WsJsonClient {
     return this.dispatchOneShot(StudiesGetMessageHandler, request);
   }
 
-  /** options_statistics：期权链统计 snapshot+patch 推送流（06 §4 实测） */
+  /** options_statistics：期权链统计 snapshot+patch 推送流（线上实测） */
   subscribeOptionsStatistics(
     request: OptionsStatisticsRequestParams,
   ): AsyncIterable<ParsedPayloadResponse> {

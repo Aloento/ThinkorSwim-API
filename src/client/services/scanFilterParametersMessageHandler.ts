@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 可用参数集合抄自 本地录制（scripts/probe-services.mjs 可复现）
+// 可用参数集合抄自 本地录制
 // scan_filter_parameters.jsonl 错误帧：
 // "Mismatched request parameter name is \"params.filter\". Available
 // parameters are [getPatternParameters, fundamentals, studies]"

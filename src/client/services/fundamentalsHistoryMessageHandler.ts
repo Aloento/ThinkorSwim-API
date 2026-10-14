@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// fundamentals/history 实测（本地录制（scripts/probe-services.mjs 可复现），
+// fundamentals/history 实测（本地录制，
 // exp-fund-hist3.mjs guest paper 逐字段扫描，2026-10-14）：
 // 参数仅 {symbol, fields}——**没有 time**：bundle 调用点里的 time 是前端网关
 // 层剥掉的，线协议直接拒（`Mismatched request parameter name is "params.time"`，

@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 响应实测自 本地录制（scripts/probe-services.mjs 可复现）。
+// 响应实测自 本地录制。
 // body 顶层为 items + exchanges；items[].symbol 形如 ".AAPL261014C245"。
 export type RawOptionQuotesSnapshotBodyResponse = {
   items: OptionQuoteItem[];

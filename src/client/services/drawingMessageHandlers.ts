@@ -13,7 +13,7 @@ import WebSocketApiMessageHandler, {
 //                        $.params.drawing: must not be null"
 //    drawing_set/create "$.params.symbol: must not be blank;
 //                        $.params.name: must not be blank"
-// 2) bundle 调用点（本地录制（scripts/probe-services.mjs 可复现），逐字核对）：
+// 2) bundle 调用点（本地录制，逐字核对）：
 //    drawing/create  params:{drawingSetGuid, drawing}   id:"drawing/create"
 //    drawing/update  params:{drawingSetGuid, drawingGuid, drawing}
 //                                                     id:"drawing/update"

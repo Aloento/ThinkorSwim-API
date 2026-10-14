@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 实测线上帧（本地录制（scripts/probe-services.mjs 可复现），前端真实流量）：
+// 实测线上帧（本地录制，前端真实流量）：
 //   → {"service":"unsubscribe","id":"unsubscribe-positions","ver":0}
 //     params {"targetRequestId":"positions","targetService":"positions"}
 //   ← snapshot {"targetService":"support_chats","targetRequestId":"..."}

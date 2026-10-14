@@ -1,7 +1,7 @@
 import GenericIncomingMessageHandler from "../../client/services/genericIncomingMessageHandler.js";
 import { RawPayloadResponse } from "../../client/tdaWsJsonTypes.js";
 // 真实线上帧回放 fixture（录制于 2026-10-13 PaperMoney 会话，
-// 源 本地录制（scripts/probe-services.mjs 可复现），大数组已截断）
+// scripts/probe-services.mjs 可重新录制，大数组已截断）
 import quotesFrames from "../fixtures/quotes.frames.json";
 import chartFrames from "../fixtures/chart.frames.json";
 import depthFrames from "../fixtures/market_depth.frames.json";

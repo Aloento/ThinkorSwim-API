@@ -4,8 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 实测自 本地录制（scripts/probe-services.mjs 可复现） 与
-// 本地录制（scripts/probe-services.mjs 可复现） / W5e.jsonl。
+// 实测自 paper 会话录制（watchlist/categories 与写用例 W5 系列帧）。
 export type WatchlistSummaryItem = {
   id: number;
   name: string;

@@ -9,7 +9,7 @@ import WebSocketApiMessageHandler, {
 // （GET_TRANSACTIONS_CATEGORIES：{startTime,endTime,account,
 //   transactionCategories,cryptoTransactionTypes,cashFutureTransactionTypes}）
 // 发全 6 参数后 snapshot 成功（equityTransactions[] 现金余额/交易流水，
-// 实测 type 含 "BAL"）。guest 下同样报校验错误（早期 06 §4 记载）。
+// 实测 type 含 "BAL"）。guest 下同样报校验错误（早期普查记载）。
 export type TransactionsCategoriesRequestParams = {
   account: string;
   /** epoch 秒（与 order_history 一致） */

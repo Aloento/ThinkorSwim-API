@@ -180,7 +180,7 @@ export interface WsJsonClient extends Disposable {
 
   getMarginCalls(): Promise<ParsedPayloadResponse>;
 
-  /** market_hours：参数是 {markets, date}，不是 exchanges（06 第 2 节） */
+  /** market_hours：参数是 {markets, date}，不是 exchanges（线上实测） */
   getMarketHours(
     request: MarketHoursRequestParams,
   ): Promise<ParsedPayloadResponse>;

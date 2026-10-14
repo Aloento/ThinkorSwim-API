@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 实测自 本地录制（scripts/probe-services.mjs 可复现）：
+// 实测自 本地录制：
 // 可用参数集合为 [symbol, limit]（"params.symbols" 报 error，见第 1 帧）。
 export type NewsHeadersGetRequestParams = {
   symbol: string;
@@ -28,7 +28,7 @@ export type RawPayloadResponseNewsHeaders = {
 
 // 新闻标题查询（单次 snapshot）。
 // 注：推送版 news_headers/subscribe 在 bundle 中确认存在，但参数/推送形状
-// 未实测（06 号文档第 4 节），暂不提供 handler。
+// 未实测（bundle 挖掘发现），暂不提供 handler。
 export default class NewsHeadersGetMessageHandler implements WebSocketApiMessageHandler<NewsHeadersGetRequestParams> {
   buildRequest({
     symbol,

@@ -4,9 +4,9 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 存在但未实测成功形状（本地录制（scripts/probe-services.mjs 可复现）
+// 存在但未实测成功形状（本地录制
 // user_properties_set.jsonl）：零参数请求也返回 snapshot（空 body），
-// 但真实写参数的形状待按需探测（06 号文档第 4 节）。
+// 但真实写参数的形状待按需探测（bundle 挖掘证据）。
 export type UserPropertiesSetRequestParams = Record<string, unknown>;
 
 export type RawPayloadResponseUserPropertiesSet = Record<string, unknown>;

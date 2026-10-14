@@ -4,14 +4,14 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 枚举抄自 本地录制（scripts/probe-services.mjs 可复现） 错误帧：
+// 枚举抄自 本地录制 错误帧：
 // "Mismatched request parameter name is \"params.type\". Possible enum
 // values are [STUDY, PUBLIC, CUSTOM]"。
 const STUDY_TYPES = ["STUDY", "PUBLIC", "CUSTOM"] as const;
 
 export type StudySubscribeType = (typeof STUDY_TYPES)[number];
 
-// task-17（本地录制（scripts/probe-services.mjs 可复现））实测：studies 元素
+// task-17（本地录制）实测：studies 元素
 // 缺 aggregationPeriod 报 "$.params.studies[0].aggregationPeriod: must not be
 // null"；非法值错误帧自曝枚举全量 24 项：
 // [MIN1, MIN2, MIN3, MIN4, MIN5, MIN10, MIN15, MIN20, MIN30, HOUR1, HOUR2,
@@ -73,7 +73,7 @@ export type RawPayloadResponseStudySubscribe = {
 
 // 指标数值订阅（推送流）。task-17 修通：此前 studies 元素缺服务端必填的
 // aggregationPeriod/parameters，全部请求被校验层拒绝（并非 guest 权限
-// 受限——06 第五轮的"受限"判断作废，见 06 第七轮补充）。CUSTOM 类型对
+// 受限——该"受限"判断作废，复测证明是 handler 缺字段）。CUSTOM 类型对
 // 不存在的脚本报 "Unknown custom script: <name>"（round3 t17c-2，非权限）。
 export default class StudySubscribeMessageHandler implements WebSocketApiMessageHandler<StudySubscribeRequestParams> {
   buildRequest({

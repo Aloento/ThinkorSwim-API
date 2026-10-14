@@ -5,7 +5,7 @@ import WebSocketApiMessageHandler, {
 } from "./webSocketApiMessageHandler.js";
 
 // 税批（tax lot）选择更新。guest 未实测任何一帧（docs/TECHNICAL.md 第三轮：bundle
-// 中存在），参数形状抄自前端 bundle（本地录制（scripts/probe-services.mjs 可复现））
+// 中存在），参数形状抄自前端 bundle（本地录制）
 // 调用点，逐字核对：
 //   {header:{service:Q.TAX_LOT_UPDATE,id:Q.TAX_LOT_UPDATE,ver:0},
 //    params:{refreshToken:t, taxLotInstructions:r}}

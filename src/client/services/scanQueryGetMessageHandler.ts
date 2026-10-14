@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 必填校验抄自 本地录制（scripts/probe-services.mjs 可复现）：
+// 必填校验抄自 本地录制：
 // "$.params.watchlistId: must not be null"。guest 传 watchlistId=100 过
 // 校验但报 "Unexpected server error"（isTerminal，docs/TECHNICAL.md 第五轮：guest
 // screener 不可用），成功帧待真实账户。
