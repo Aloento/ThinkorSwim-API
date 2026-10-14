@@ -49,6 +49,16 @@ import { UnsubscribeRequestParams } from "./services/unsubscribeMessageHandler.j
 import { WatchlistCategoriesRequestParams } from "./services/watchlistCategoriesMessageHandler.js";
 import { WatchlistCreateRequestParams } from "./services/watchlistCreateMessageHandler.js";
 import { WatchlistRenameRequestParams } from "./services/watchlistRenameMessageHandler.js";
+// ---- 第五批参数类型（task-13，agent/07 §第五批接入契约）----
+import { DisclosuresAcceptRequestParams } from "./services/disclosuresAcceptMessageHandler.js";
+import { FundamentalsCurrentRequestParams } from "./services/fundamentalsCurrentMessageHandler.js";
+import { NewsHeadersGetRequestParams } from "./services/newsHeadersGetMessageHandler.js";
+import { OptionsStatisticsRequestParams } from "./services/optionsStatisticsMessageHandler.js";
+import { OrderHistoryRequestParams } from "./services/orderHistoryMessageHandler.js";
+import { StudiesGetRequestParams } from "./services/studiesGetMessageHandler.js";
+import { TaxLotGetRequestParams } from "./services/taxLotGetMessageHandler.js";
+import { TransactionsCategoriesRequestParams } from "./services/transactionsCategoriesMessageHandler.js";
+import { UserPropertiesSetRequestParams } from "./services/userPropertiesSetMessageHandler.js";
 import { ParsedPayloadResponse } from "./tdaWsJsonTypes.js";
 import { WsJsonClient } from "./wsJsonClient.js";
 
@@ -657,5 +667,109 @@ export default class MockWsJsonClient implements WsJsonClient {
   /** ⚠️ 危险操作的 mock：不会真的终止会话，见 WsJsonClient 接口注释。 */
   logoff(_: LogoffSchwabRequestParams): Promise<ParsedPayloadResponse> {
     return Promise.resolve({ service: "logoff/schwab", body: {} });
+  }
+
+  // ---- 第五批 mock（agent/07 §第五批接入契约，task-13）----
+
+  getNews(_: NewsHeadersGetRequestParams): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "news_headers/get",
+      body: {
+        news: [
+          {
+            newsCode: "DOW_JONES:test",
+            time: "2026-10-13T22:26:11Z",
+            title: "Test headline",
+            symbols: ["AAPL"],
+            channel: "DOW_JONES",
+          },
+        ],
+      },
+    });
+  }
+
+  getFundamentals(
+    request: FundamentalsCurrentRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "fundamentals/current",
+      body: { symbol: request.symbol, values: { EARNINGS_PER_SHARE_TTM: 7.3 } },
+    });
+  }
+
+  getStudies(_: StudiesGetRequestParams): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "studies/get",
+      body: { studiesGetResponseJTOS: [{ name: "SimpleMovingAvg" }] },
+    });
+  }
+
+  async *subscribeOptionsStatistics(
+    request: OptionsStatisticsRequestParams,
+  ): AsyncIterable<ParsedPayloadResponse> {
+    yield {
+      service: "options_statistics",
+      body: {
+        symbol: request.symbol,
+        pcRatio: 0.8,
+        totalVolume: { values: { calls: 10, puts: 8, total: 18 } },
+        delta: {},
+      },
+    };
+  }
+
+  getOrderHistory(
+    _request: OrderHistoryRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "order_history",
+      body: {
+        orderHistoryEntries: [
+          { orderId: 1, symbol: "AAPL", status: "CANCELED" },
+        ],
+      },
+    });
+  }
+
+  getTaxLots(_: TaxLotGetRequestParams): Promise<ParsedPayloadResponse> {
+    // 成功形状 guest 未实测（权限拒绝），mock 给宽结构。
+    return Promise.resolve({ service: "tax_lot/get", body: { lots: [] } });
+  }
+
+  getTransactionCategories(
+    _request: TransactionsCategoriesRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    // 成功形状未实测（guest 校验错误），mock 给空对象。
+    return Promise.resolve({ service: "transactions/categories", body: {} });
+  }
+
+  async *subscribeGlobalChats(): AsyncIterable<ParsedPayloadResponse> {
+    yield {
+      service: "chat_global/messages",
+      body: {
+        messages: { OPEN: "true" },
+        hoursSchedule: "mo_07:00-mo_17:00",
+        chatHours: {
+          MONDAY: { open: true, fromTime: "07:00", toTime: "17:00" },
+        },
+      },
+    };
+  }
+
+  getSupportChats(): Promise<ParsedPayloadResponse> {
+    // guest 实测 body 为空对象。
+    return Promise.resolve({ service: "support_chats", body: {} });
+  }
+
+  setUserProperties(
+    _request: UserPropertiesSetRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({ service: "user_properties/set", body: {} });
+  }
+
+  acceptDisclosures(
+    _request: DisclosuresAcceptRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({ service: "disclosures/accept", body: {} });
   }
 }

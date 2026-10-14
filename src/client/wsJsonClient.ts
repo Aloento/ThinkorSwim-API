@@ -52,6 +52,16 @@ import { UnsubscribeRequestParams } from "./services/unsubscribeMessageHandler.j
 import { WatchlistCategoriesRequestParams } from "./services/watchlistCategoriesMessageHandler.js";
 import { WatchlistCreateRequestParams } from "./services/watchlistCreateMessageHandler.js";
 import { WatchlistRenameRequestParams } from "./services/watchlistRenameMessageHandler.js";
+// ---- 第五批参数类型（task-13，agent/07 §第五批接入契约）----
+import { DisclosuresAcceptRequestParams } from "./services/disclosuresAcceptMessageHandler.js";
+import { FundamentalsCurrentRequestParams } from "./services/fundamentalsCurrentMessageHandler.js";
+import { NewsHeadersGetRequestParams } from "./services/newsHeadersGetMessageHandler.js";
+import { OptionsStatisticsRequestParams } from "./services/optionsStatisticsMessageHandler.js";
+import { OrderHistoryRequestParams } from "./services/orderHistoryMessageHandler.js";
+import { StudiesGetRequestParams } from "./services/studiesGetMessageHandler.js";
+import { TaxLotGetRequestParams } from "./services/taxLotGetMessageHandler.js";
+import { TransactionsCategoriesRequestParams } from "./services/transactionsCategoriesMessageHandler.js";
+import { UserPropertiesSetRequestParams } from "./services/userPropertiesSetMessageHandler.js";
 import { ParsedPayloadResponse } from "./tdaWsJsonTypes.js";
 
 export interface WsJsonClient extends Disposable {
@@ -339,4 +349,59 @@ export interface WsJsonClient extends Disposable {
    * @deprecated 危险操作：终结会话，仅显式登出时使用。
    */
   logoff(request: LogoffSchwabRequestParams): Promise<ParsedPayloadResponse>;
+
+  // ---- 第五批（agent/07 §"第五批接入契约"，task-5/2 批次 11 个 handler 收尾）----
+
+  /** news_headers/get：新闻标题 snapshot（实测参数 [symbol, limit?]） */
+  getNews(request: NewsHeadersGetRequestParams): Promise<ParsedPayloadResponse>;
+
+  /** fundamentals/current：当前基本面（symbol/time/fields 均必传） */
+  getFundamentals(
+    request: FundamentalsCurrentRequestParams,
+  ): Promise<ParsedPayloadResponse>;
+
+  /** studies/get：研究指标元数据（studies 非空真实研究名） */
+  getStudies(request: StudiesGetRequestParams): Promise<ParsedPayloadResponse>;
+
+  /** options_statistics：期权链统计 snapshot+patch 推送流 */
+  subscribeOptionsStatistics(
+    request: OptionsStatisticsRequestParams,
+  ): AsyncIterable<ParsedPayloadResponse>;
+
+  /** order_history：订单历史（epoch 秒、窗口 ≤370 天、真实账户 code） */
+  getOrderHistory(
+    request: OrderHistoryRequestParams,
+  ): Promise<ParsedPayloadResponse>;
+
+  /** tax_lot/get：税则批次（guest 被拒，真实账户待测） */
+  getTaxLots(request: TaxLotGetRequestParams): Promise<ParsedPayloadResponse>;
+
+  /**
+   * transactions/categories：交易分类目录（guest 未测标注）。
+   * 契约表写 `getTransactionCategories()`，但 handler 实测参数为
+   * {account}（06 §4），故保留参数。
+   */
+  getTransactionCategories(
+    request: TransactionsCategoriesRequestParams,
+  ): Promise<ParsedPayloadResponse>;
+
+  /** chat_global/messages：chat 全局公告流（首帧 snapshot，变更推送） */
+  subscribeGlobalChats(): AsyncIterable<ParsedPayloadResponse>;
+
+  /** support_chats：客服会话列表（guest 实测空 body） */
+  getSupportChats(): Promise<ParsedPayloadResponse>;
+
+  /**
+   * ⚠️ user_properties/set：写用户属性（写操作，参数形状未实测确认）。
+   */
+  setUserProperties(
+    request: UserPropertiesSetRequestParams,
+  ): Promise<ParsedPayloadResponse>;
+
+  /**
+   * ⚠️ disclosures/accept：接受披露协议（写操作，disclosureIds 非空）。
+   */
+  acceptDisclosures(
+    request: DisclosuresAcceptRequestParams,
+  ): Promise<ParsedPayloadResponse>;
 }

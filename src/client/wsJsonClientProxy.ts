@@ -57,6 +57,16 @@ import { UnsubscribeRequestParams } from "./services/unsubscribeMessageHandler.j
 import { WatchlistCategoriesRequestParams } from "./services/watchlistCategoriesMessageHandler.js";
 import { WatchlistCreateRequestParams } from "./services/watchlistCreateMessageHandler.js";
 import { WatchlistRenameRequestParams } from "./services/watchlistRenameMessageHandler.js";
+// ---- 第五批参数类型（task-13，agent/07 §第五批接入契约）----
+import { DisclosuresAcceptRequestParams } from "./services/disclosuresAcceptMessageHandler.js";
+import { FundamentalsCurrentRequestParams } from "./services/fundamentalsCurrentMessageHandler.js";
+import { NewsHeadersGetRequestParams } from "./services/newsHeadersGetMessageHandler.js";
+import { OptionsStatisticsRequestParams } from "./services/optionsStatisticsMessageHandler.js";
+import { OrderHistoryRequestParams } from "./services/orderHistoryMessageHandler.js";
+import { StudiesGetRequestParams } from "./services/studiesGetMessageHandler.js";
+import { TaxLotGetRequestParams } from "./services/taxLotGetMessageHandler.js";
+import { TransactionsCategoriesRequestParams } from "./services/transactionsCategoriesMessageHandler.js";
+import { UserPropertiesSetRequestParams } from "./services/userPropertiesSetMessageHandler.js";
 import { ParsedPayloadResponse } from "./tdaWsJsonTypes.js";
 import { WsJsonClient } from "./wsJsonClient.js";
 
@@ -136,6 +146,18 @@ export const ALL_REQUESTS = [
   "demoAccountSetBalance",
   "demoAccountAdjustCash",
   "logoff",
+  // ---- 第五批（task-13）：全部单对象参数或零参，wire 上 args 即参数本体----
+  "getNews",
+  "getFundamentals",
+  "getStudies",
+  "subscribeOptionsStatistics",
+  "getOrderHistory",
+  "getTaxLots",
+  "getTransactionCategories",
+  "subscribeGlobalChats",
+  "getSupportChats",
+  "setUserProperties",
+  "acceptDisclosures",
 ] as const;
 type RequestType = typeof ALL_REQUESTS;
 export type Request = RequestType[number];
@@ -738,6 +760,94 @@ export class WsJsonClientProxy implements WsJsonClient {
   /** ⚠️ 危险操作透传，见 WsJsonClient 接口注释。 */
   logoff(request: LogoffSchwabRequestParams): Promise<ParsedPayloadResponse> {
     return this.dispatch<ParsedPayloadResponse>("logoff", request).promise();
+  }
+
+  // ---- 第五批透传（task-13）：全部单对象参数或零参，直接 dispatch ----
+
+  getNews(
+    request: NewsHeadersGetRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>("getNews", request).promise();
+  }
+
+  getFundamentals(
+    request: FundamentalsCurrentRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "getFundamentals",
+      request,
+    ).promise();
+  }
+
+  getStudies(request: StudiesGetRequestParams): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "getStudies",
+      request,
+    ).promise();
+  }
+
+  subscribeOptionsStatistics(
+    request: OptionsStatisticsRequestParams,
+  ): AsyncIterable<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "subscribeOptionsStatistics",
+      request,
+    ).iterable();
+  }
+
+  getOrderHistory(
+    request: OrderHistoryRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "getOrderHistory",
+      request,
+    ).promise();
+  }
+
+  getTaxLots(request: TaxLotGetRequestParams): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "getTaxLots",
+      request,
+    ).promise();
+  }
+
+  getTransactionCategories(
+    request: TransactionsCategoriesRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "getTransactionCategories",
+      request,
+    ).promise();
+  }
+
+  subscribeGlobalChats(): AsyncIterable<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "subscribeGlobalChats",
+    ).iterable();
+  }
+
+  getSupportChats(): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>("getSupportChats").promise();
+  }
+
+  /** ⚠️ 写操作透传，见 WsJsonClient 接口注释。 */
+  setUserProperties(
+    request: UserPropertiesSetRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "setUserProperties",
+      request,
+    ).promise();
+  }
+
+  /** ⚠️ 写操作透传，见 WsJsonClient 接口注释。 */
+  acceptDisclosures(
+    request: DisclosuresAcceptRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "acceptDisclosures",
+      request,
+    ).promise();
   }
 
   workingOrders(accountNumber: string): AsyncIterable<ParsedPayloadResponse> {

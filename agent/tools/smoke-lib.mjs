@@ -1,6 +1,6 @@
 // 端到端冒烟：用编译后的库 API（RealWsJsonClient）跑 guest paper 会话。
 // 前置：pnpm build 且 agent/tools/.env.blackbox 有 TOS_GUEST_ACCESS_TOKEN（过期则先跑 auth-guest.mjs）。
-// 验证门面方法在真实服务器上的行为：login→accounts→statement→market_hours→quotes→watchlist→第四批(study/scan/quotes/get)。
+// 验证门面方法在真实服务器上的行为：login→accounts→statement→market_hours→quotes→watchlist→第四批(study/scan/quotes/get)→第五批(news/fundamentals/order_history)。
 import { config } from "dotenv";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -139,6 +139,47 @@ console.log(
 );
 if (!firstItem?.values) {
   console.error("[smoke] FAIL: quotes/get returned no items[0].values");
+  process.exit(1);
+}
+
+// 第五批门面冒烟（task-13，guest 实测可达三条，均有 probe-2026-10-13 成功帧）：
+// news_headers/get / fundamentals/current / order_history。
+const news = await client.getNews({ symbol: "AAPL", limit: 3 });
+const newsCount = news.body.news?.length ?? 0;
+console.log("[smoke] news_headers/get: news=", newsCount);
+if (newsCount === 0) {
+  console.error("[smoke] FAIL: news_headers/get returned no news");
+  process.exit(1);
+}
+
+const fundamentals = await client.getFundamentals({
+  symbol: "AAPL",
+  time: "QUARTERLY",
+  fields: ["EARNINGS_PER_SHARE_TTM", "DIVIDEND_YIELD"],
+});
+console.log(
+  "[smoke] fundamentals/current:",
+  JSON.stringify(fundamentals.body.values),
+);
+if (!fundamentals.body.values) {
+  console.error("[smoke] FAIL: fundamentals/current returned no values");
+  process.exit(1);
+}
+
+// order_history：epoch 秒，窗口 ≤370 天（用近 90 天；paper 账户实测 code）
+const nowSec = Math.floor(Date.now() / 1000);
+const history = await client.getOrderHistory({
+  account: "D-12345678",
+  startTime: nowSec - 90 * 24 * 3600,
+  endTime: nowSec,
+  orderEntryFields: ["ORDER_ID", "SYMBOL", "STATUS", "TIME_PLACED"],
+});
+console.log(
+  "[smoke] order_history: entries=",
+  history.body.orderHistoryEntries?.length,
+);
+if (!Array.isArray(history.body.orderHistoryEntries)) {
+  console.error("[smoke] FAIL: order_history returned no entries array");
   process.exit(1);
 }
 

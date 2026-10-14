@@ -156,6 +156,36 @@ import WatchlistRenameMessageHandler, {
 import WatchlistRearrangeMessageHandler from "./services/watchlistRearrangeMessageHandler.js";
 import WebSocketApiMessageHandler from "./services/webSocketApiMessageHandler.js";
 import WorkingOrdersMessageHandler from "./services/workingOrdersMessageHandler.js";
+// ---- 第五批 handler 与其参数类型（task-13，agent/07 §第五批接入契约）----
+import ChatGlobalMessagesMessageHandler from "./services/chatGlobalMessagesMessageHandler.js";
+import DisclosuresAcceptMessageHandler, {
+  DisclosuresAcceptRequestParams,
+} from "./services/disclosuresAcceptMessageHandler.js";
+import FundamentalsCurrentMessageHandler, {
+  FundamentalsCurrentRequestParams,
+} from "./services/fundamentalsCurrentMessageHandler.js";
+import NewsHeadersGetMessageHandler, {
+  NewsHeadersGetRequestParams,
+} from "./services/newsHeadersGetMessageHandler.js";
+import OptionsStatisticsMessageHandler, {
+  OptionsStatisticsRequestParams,
+} from "./services/optionsStatisticsMessageHandler.js";
+import OrderHistoryMessageHandler, {
+  OrderHistoryRequestParams,
+} from "./services/orderHistoryMessageHandler.js";
+import StudiesGetMessageHandler, {
+  StudiesGetRequestParams,
+} from "./services/studiesGetMessageHandler.js";
+import SupportChatsMessageHandler from "./services/supportChatsMessageHandler.js";
+import TaxLotGetMessageHandler, {
+  TaxLotGetRequestParams,
+} from "./services/taxLotGetMessageHandler.js";
+import TransactionsCategoriesMessageHandler, {
+  TransactionsCategoriesRequestParams,
+} from "./services/transactionsCategoriesMessageHandler.js";
+import UserPropertiesSetMessageHandler, {
+  UserPropertiesSetRequestParams,
+} from "./services/userPropertiesSetMessageHandler.js";
 import {
   AuthError,
   ParsedPayloadResponse,
@@ -259,6 +289,19 @@ const messageHandlers: WebSocketApiMessageHandler<never>[] = [
   new DemoAccountSetBalanceMessageHandler(),
   new DemoAccountAdjustCashMessageHandler(),
   new LogoffSchwabMessageHandler(),
+  // ---- 第五批（task-13）：11 个漏接 handler 全量注册（同样经
+  // findByTypeOrThrow 查表，漏注册 = 运行时抛错）----
+  new NewsHeadersGetMessageHandler(),
+  new FundamentalsCurrentMessageHandler(),
+  new StudiesGetMessageHandler(),
+  new OptionsStatisticsMessageHandler(),
+  new OrderHistoryMessageHandler(),
+  new TaxLotGetMessageHandler(),
+  new TransactionsCategoriesMessageHandler(),
+  new ChatGlobalMessagesMessageHandler(),
+  new SupportChatsMessageHandler(),
+  new UserPropertiesSetMessageHandler(),
+  new DisclosuresAcceptMessageHandler(),
 ];
 
 export const DEFAULT_WS_URL =
@@ -1239,6 +1282,96 @@ export class RealWsJsonClient implements WsJsonClient {
 
   marketDepth(symbol: string): AsyncIterable<ParsedPayloadResponse> {
     return this.dispatchHandler(MarketDepthMessageHandler, symbol).iterable();
+  }
+
+  // ---- 第五批门面（agent/07 §第五批接入契约，task-13）----
+  // Promise 型走 dispatchOneShot；持续推送流走 dispatchHandler（重放语义
+  // 同第四批）。options_statistics 为 snapshot+patch 流（06 §4 实测），
+  // 按契约以 AsyncIterable 消费。
+
+  /** news_headers/get：新闻标题（单次 snapshot，实测参数 [symbol, limit]） */
+  getNews(
+    request: NewsHeadersGetRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(NewsHeadersGetMessageHandler, request);
+  }
+
+  /** fundamentals/current：当前基本面指标（fields/time 必传，服务端校验） */
+  getFundamentals(
+    request: FundamentalsCurrentRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(FundamentalsCurrentMessageHandler, request);
+  }
+
+  /** studies/get：研究指标元数据（studies 必须是非空真实研究名） */
+  getStudies(request: StudiesGetRequestParams): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(StudiesGetMessageHandler, request);
+  }
+
+  /** options_statistics：期权链统计 snapshot+patch 推送流（06 §4 实测） */
+  subscribeOptionsStatistics(
+    request: OptionsStatisticsRequestParams,
+  ): AsyncIterable<ParsedPayloadResponse> {
+    return this.dispatchHandler(
+      OptionsStatisticsMessageHandler,
+      request,
+    ).iterable();
+  }
+
+  /** order_history：订单历史（epoch 秒、窗口 ≤370 天、account 用真实 code） */
+  getOrderHistory(
+    request: OrderHistoryRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(OrderHistoryMessageHandler, request);
+  }
+
+  /** tax_lot/get：税则批次查询（guest 被服务端拒绝，真实账户待测） */
+  getTaxLots(request: TaxLotGetRequestParams): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(TaxLotGetMessageHandler, request);
+  }
+
+  /** transactions/categories：交易分类目录（guest 校验错误，真实账户待测） */
+  getTransactionCategories(
+    request: TransactionsCategoriesRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(TransactionsCategoriesMessageHandler, request);
+  }
+
+  /**
+   * chat_global/messages：交易台 chat 全局公告/服务时间。
+   * 契约（agent/07 第五批）定为 AsyncIterable：首帧 snapshot，公告/开关
+   * 变更由服务端推送更新（probe 观察窗内仅一帧 snapshot）。
+   */
+  subscribeGlobalChats(): AsyncIterable<ParsedPayloadResponse> {
+    return this.dispatchHandler(
+      ChatGlobalMessagesMessageHandler,
+      undefined,
+    ).iterable();
+  }
+
+  /** support_chats：客服 chat 会话列表（单次 snapshot，guest 实测空 body） */
+  getSupportChats(): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(SupportChatsMessageHandler, undefined);
+  }
+
+  /**
+   * ⚠️ user_properties/set：写用户属性（写操作）。参数形状未实测确认
+   * （guest 空对象也回 snapshot {}），谨慎使用。
+   */
+  setUserProperties(
+    request: UserPropertiesSetRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(UserPropertiesSetMessageHandler, request);
+  }
+
+  /**
+   * ⚠️ disclosures/accept：接受披露协议（写操作，disclosureIds 非空）。
+   * guest 无可接受披露，成功形状未实测。
+   */
+  acceptDisclosures(
+    request: DisclosuresAcceptRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(DisclosuresAcceptMessageHandler, request);
   }
 
   private dispatch<Req>(

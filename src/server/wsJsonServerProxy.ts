@@ -55,6 +55,8 @@ export default class WsJsonServerProxy implements Disposable {
       case "subscribeStudies":
       case "subscribeNews":
       case "subscribeRelevantNews":
+      case "subscribeOptionsStatistics":
+      case "subscribeGlobalChats":
         return await this.relayIterable(msg);
       // 单参/零参方法 → relayPromise 单参分发；第四批（task-9）方法
       // 全部单对象参数，直接并入本组（双参方法才走 relaySpread）。
@@ -109,6 +111,16 @@ export default class WsJsonServerProxy implements Disposable {
       case "demoAccountSetBalance":
       case "demoAccountAdjustCash":
       case "logoff":
+      case "getNews":
+      case "getFundamentals":
+      case "getStudies":
+      case "getOrderHistory":
+      case "getTaxLots":
+      case "getTransactionCategories":
+      case "getSupportChats":
+      case "setUserProperties":
+      case "acceptDisclosures":
+        // 第五批（task-13）门面方法全部单对象参数或零参，并入本组。
         return await this.relayPromise(msg);
       case "addToWatchlist":
       case "removeFromWatchlist":

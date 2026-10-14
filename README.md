@@ -75,10 +75,6 @@ node --env-file=.env dist/example/wsProxyServer.js
 > 握手/登录超时（15s）、重连后活跃流式订阅原样重放；for-await 提前 break/抛异常自动回收
 > 补丁基底并向服务端发 `unsubscribe`（`autoUnsubscribe` 可关）；错误全部为 Error 子类
 > （`WebSocketApiError`/`AuthError`/`TransportError`）。
->
-> 注：`news_headers/get`、`fundamentals/current`、`studies/get`、`options_statistics`、
-> `order_history`、`tax_lot/get` 等已具备完整 handler（协议/参数实测背书），门面方法
-> 正在收尾接入；接入前可直接用对应 `*MessageHandler` 构造请求。
 
 # 已知限制
 
