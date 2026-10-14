@@ -116,7 +116,7 @@ connect ──▶ {ver:"27.*.*", fmt:"json-patches-structured", heartbeat:"2s"}
 - `error`：`body:{message, isTerminal}` 全局一致；错误后服务端常伴
   `unsubscribe/<service>$<requestId>` 快照帧。
 - 未注册服务统一回 `{message:"Undefined service: xxx"}`。
-- **基底跨 ver 命中**（task-16 根治）：`service+id` 为基底 key，同一 id 至多一条
+- **基底跨 ver 命中**：`service+id` 为基底 key，同一 id 至多一条
   基底——SUBMIT（ver:0）的 orderId patch 能正确合并进 CONFIRM（ver:1）草稿基底。
 
 ### 3.4 响应形态要点（实测）
@@ -225,7 +225,7 @@ SUBMIT : place_order  ver:0  action:"SUBMIT"    ★ 必须复用同一 header.id
   门面 API 用 `STOP_LIMIT`，buildRequest 映射。
 - wire 订单类型全集（snapshot `types.values`）：`MARKET LIMIT STOP STOPLIMIT
 TRAILSTOP TRAILSTOPLIMIT MOC LOC`（错误帧扩至 CANCEL/WALK_LIMIT/EXERCISE/…）。
-- `tifs.values` 实测 `[DAY, GTC, EXT, GTC_EXT, AM, PM]`（早期推测的 WEEK/EXTENDED
+- `tifs.values` 实测 `[DAY, GTC, EXT, GTC_EXT, AM, PM]`（WEEK/EXTENDED
   不存在）。
 - 期权腿：`optionSeries → option_chain/get(seriesNames)` 拿真实合约
   （wire 带前导点、strike 可小数，如 `.AAPL261014C337.5`）→ `legs[].symbol` 直传。
@@ -262,7 +262,7 @@ TRAILSTOP TRAILSTOPLIMIT MOC LOC`（错误帧扩至 CANCEL/WALK_LIMIT/EXERCISE/�
 | 基本面         | fundamentals/current, fundamentals/history                                                 | getFundamentals（time ∈ [QUARTERLY, ANNUAL]） / getFundamentalsHistory（**无 time 参数**，fields 仅 21 个 historical 字段）                 | ✅ REAL                                                             |
 | 新闻面板       | news_headers/get, get_relevant, subscribe(_relevant), news_body                            | getNews / getRelevantNews / subscribeNews / subscribeRelevantNews / newsBody                                                                | ✅ REAL（relevant 真实账户 news=5；guest 权限拒=分类 b）            |
 | 品种搜索       | instrument_search                                                                          | searchInstruments                                                                                                                           | ✅                                                                  |
-| 下单/改单/撤单 | place_order(CONFIRM/SUBMIT/EDIT), cancel_order                                             | placeOrder / confirmOrder / submitOrder / replaceOrder / cancelOrder（可选 guard）                                                          | ✅（W1-W4+W8-W10 实测）                                             |
+| 下单/改单/撤单 | place_order(CONFIRM/SUBMIT/EDIT), cancel_order                                             | placeOrder / confirmOrder / submitOrder / replaceOrder / cancelOrder（可选 guard）                                                          | ✅（写用例实测）                                                    |
 | 告警中心       | alerts/create, cancel, lookup, subscribe                                                   | createAlert / cancelAlert / lookupAlerts / subscribeAlerts                                                                                  | ✅ REAL（lookup snapshot；create/cancel 真实账户禁写未测）          |
 | 自选列表全套   | watchlist/get, categories, create, rename, delete, add, remove, rearrange                  | watchlist / getWatchlists / createWatchlist / renameWatchlist / deleteWatchlist / addToWatchlist / removeFromWatchlist / rearrangeWatchlist | ✅（闭环冒烟；watchlistId 必须用 create 返回的真实 id）             |
 | 消息中心       | message_center/get, subscribe                                                              | getMessageCenter / subscribeMessageCenter                                                                                                   | ✅                                                                  |
@@ -275,10 +275,10 @@ TRAILSTOP TRAILSTOPLIMIT MOC LOC`（错误帧扩至 CANCEL/WALK_LIMIT/EXERCISE/�
 | 订阅清理       | unsubscribe                                                                                | unsubscribe /（流 break 自动发，autoUnsubscribe 可关）                                                                                      | ✅                                                                  |
 | 演示账户调额   | demo_account/set_balance, adjust_cash                                                      | demoAccountSetBalance⚠️ / demoAccountAdjustCash⚠️                                                                                           | 🔧（真实账户禁写）                                                  |
 
-**已证伪、勿再探测**：`user_preferences, social_view, screeners, news,
+**不存在的服务名（常见猜测，均回 "Undefined service"）**：`user_preferences, social_view, screeners, news,
 fundamental_history, trans_history, watchlist/get_all, account_history, tax_lots,
 order_preview, predict/quotes/options, quotes/options/centered`
-（猜测名不存在，真实对应：news→news_headers/get、fundamental_history→
+（真实对应：news→news_headers/get、fundamental_history→
 fundamentals/current、tax_lots→tax_lot/get、account_history→order_history、
 trans_history→transactions/categories、screeners→scan_query/scan_filter 系列）。
 
@@ -382,7 +382,7 @@ cashFutureTransactionTypes?}`（后三可空数组），真实账户 snapshot 93
 ### 9.7 study/subscribe 元素必带 aggregationPeriod
 
 `{name, aggregationPeriod:"DAY", parameters:{}}`；缺字段报 `must not be null`，
-枚举 24 值（MIN1…YEAR）。早期"guest 受限"结论作废——是 handler 缺字段的真 bug。
+枚举 24 值（MIN1…YEAR）。注意这不是权限问题——guest 同样可用，缺字段才报错。
 `parameters` 省略反而报服务端错（保守必填）；`plot` 传值被拒不发。
 
 ### 9.8 market_depth 真实账户裸会话不推帧（分类 c）
@@ -399,18 +399,18 @@ cashFutureTransactionTypes?}`（后三可空数组），真实账户 snapshot 93
 - **(c) 服务端错/不推帧**：参数正确但环境限制（9.8、guest 的 scan_query）→
   分类记录；"错误帧=失败、纯超时=环境限制"。
 
-### 9.10 参数漂移修正史（对旧代码/旧文档的推翻）
+### 9.10 参数口径速查（易踩坑处）
 
-| 服务                 | 旧姿势                            | 实测口径                                                                                                                                                          |
+| 服务                 | 常见误用                          | 实测口径                                                                                                                                                          |
 | -------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | chart                | `includeExtendedHours` ❌         | `extendedHours`；可用参数 [priceType, timeAggregation, extendedHours, studies, symbol, startAtMarketOpen, range, cryptoMidnightUtc, tickAggregation, refreshRate] |
 | market_hours         | `exchanges` ❌                    | `[date, markets]`（markets=["EQUITY","OPTION","FUTURE"]）                                                                                                         |
 | quotes               | 硬编码 account:"COMBINED ACCOUNT" | 可省略，结果一致（已移除硬编码）                                                                                                                                  |
 | fundamentals/history | 带 `time` ❌                      | 仅 `{symbol, fields}`；time 是前端网关层剥的，wsjson 直接拒                                                                                                       |
 | order_history        | —                                 | account 要**真实 code**（非 COMBINED ACCOUNT），startTime/endTime **epoch 秒**，窗口 ≤370 天                                                                      |
-| order_events 状态    | 推测有 PARTIAL                    | 官方词表无 PARTIAL（EXECUTION+filledQuantity 表达）                                                                                                               |
-| 下单版本描述         | "ver 1→ver 0 两段式"              | 准确口径：CONFIRM ver:1 / SUBMIT ver:0 **同 id**，差异在 action/requestType                                                                                       |
-| quotes 成分修改      | 早期"疑走 REST/服务不存在"        | 实名 `watchlist/add                                                                                                                                               | remove | rearrange`（bundle 挖掘推翻猜测名） |
+| order_events 状态    | 以为有 PARTIAL                    | 官方词表无 PARTIAL（EXECUTION+filledQuantity 表达）                                                                                                               |
+| 下单版本             | 笼统称"ver 1→ver 0 两段式"        | 准确口径：CONFIRM ver:1 / SUBMIT ver:0 **同 id**，差异在 action/requestType                                                                                       |
+| 自选成分修改         | 猜测服务名                        | 实名 `watchlist/add`、`watchlist/remove`、`watchlist/rearrange`（猜测名均 "Undefined service"）                                                                   |
 | login 响应           | quotePermissions 对象             | 已变**数组**；新增 isCryptoSignupEligible/isPdtHidden；userDomain 仍回 "TDA"（遗留字段）                                                                          |
 
 ### 9.11 错误帧机制与协议鲁棒性
