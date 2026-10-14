@@ -48,7 +48,8 @@
 4. **库实现覆盖**：`ApiService` 77 个服务名、50+ handler、四批门面接入；下单两步
    （CONFIRM/SUBMIT 同草稿 id）、真实线帧回放测试、连接生命周期（重连退避/心跳
    看门狗/订阅重放）全部落地并在真实服务器上冒烟通过。
-5. **真实账户回归（第九轮 2026-10-14）**：真实账户 F2A 半自动登录 + 32 项只读
+5. **真实账户回归（第九轮 2026-10-14）**：真实账户 F2A 登录（auth-real v2 默认
+   无头，自动选渠道：移动推送手机点批准/短信终端回传码）+ 32 项只读
    核对全绿（`smoke-real.mjs`），news_relevant/study_subscribe/scan_query/
    transactions_categories 等 guest 受限项全部在真实账户跑通；token 自动续期
    （Authenticator）端到端链式轮换验证通过（scope="api"）。

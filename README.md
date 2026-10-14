@@ -59,8 +59,12 @@ node --env-file=.env dist/example/wsProxyServer.js
    `login` 帧（token 复用登录）响应不含 accessTokenInfo，收割需抓页面
    `login/schwab` 帧，工具 `agent/tools/auth-real.mjs` 已自动化）。
 3. **token → 会话**：`login` 服务复用 token（**token 可跨 WS 连接复用，有效期约 24h**）。
-   真实账户 F2A 登录（`agent/tools/auth-real.mjs`）为半自动交接：脚本自动代填
-   账密，出现 F2A 页后由用户在弹出的浏览器完成手机验证/勾选信任设备。
+   真实账户 F2A 登录（`agent/tools/auth-real.mjs`，**默认无头**）：脚本自动代填
+   账密并自动处理 F2A——自动勾选"信任设备"、优先选"Send a mobile notification"
+   渠道（人在手机上点批准即可，页面自行轮询），无该渠道则退回"Text Message"
+   并在终端提示回传短信验证码；`--headed` 可回退有头全人工模式。实测 Chrome 155
+   的 new headless 与有头浏览器指纹逐信号一致（`agent/tools/exp-fp.mjs`），
+   默认 stealth 即可复刻已验证指纹。
 4. ⚠️ **数据中心与 token 绑定**：模拟盘（PaperMoney）必须连
    `wss://papermoney-services.schwab.com/Services/WsJson`；真实账户连
    `thinkorswim-services`。连错报 `Invalid token (server session id)`。
