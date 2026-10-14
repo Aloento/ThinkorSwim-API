@@ -15,7 +15,9 @@ import WebSocketApiMessageHandler, {
 
 export type AccessTokenGetRequestParams = {
   refreshToken: string;
-  // 实测口径待真实账户；OAuth 侧常用 "GENERAL"（见 src/auth/guestpass.ts）
+  // 真实账户实测（2026-10-14，exp-token-scope.mjs）："api" 成功轮换
+  // （accessExpiresIn=86400）；"GENERAL" 被拒 NOT_AUTHORIZED:
+  // Unrecognized scope。
   scope: string;
   clientId: string;
 };

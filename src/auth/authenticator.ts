@@ -20,8 +20,12 @@ import type { WsJsonClient } from "../client/wsJsonClient.js";
 /** accessToken 有效期约 24h，提前 1h 视为到期（实测口径，agent/06）。 */
 export const DEFAULT_TOKEN_TTL_MS = 23 * 60 * 60 * 1000;
 
-/** OAuth 侧常用 scope（agent/06 第三轮线索）；服务端 schema 仅要求非 null。 */
-export const DEFAULT_REFRESH_SCOPE = "GENERAL";
+/**
+ * 真实账户实测（2026-10-14，agent/tools/exp-token-scope.mjs）：
+ * access_token/get 的 scope 合法值为 "api"；"GENERAL"（guest OAuth REST
+ * 侧常用值）被服务端拒 "NOT_AUTHORIZED: Unrecognized scope"。
+ */
+export const DEFAULT_REFRESH_SCOPE = "api";
 
 export type AuthTokenPair = {
   accessToken: string;
@@ -56,7 +60,7 @@ export type AuthenticatorOptions = {
   refreshChannel?: TokenRefreshChannel;
   /** 到期阈值，默认 23h（DEFAULT_TOKEN_TTL_MS） */
   tokenTtlMs?: number;
-  /** access_token/get 的 scope，默认 "GENERAL" */
+  /** access_token/get 的 scope，默认 "api"（真实账户实测值） */
   scope?: string;
   /**
    * 持有一个已连接的客户端：缺省刷新通道走它的 getAccessToken

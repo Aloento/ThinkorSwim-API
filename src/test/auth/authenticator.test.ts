@@ -1,4 +1,4 @@
-import WS from "jest-websocket-mock";
+﻿import WS from "jest-websocket-mock";
 import Authenticator, { AuthenticatorOptions } from "../../auth/authenticator";
 import {
   CONNECTION_REQUEST_MESSAGE,
@@ -69,7 +69,7 @@ describe("Authenticator (R1 token 续期)", () => {
     );
     expect(refreshChannel).toHaveBeenCalledWith({
       refreshToken: "refresh-0",
-      scope: "GENERAL",
+      scope: "api",
       clientId,
     });
     // 轮换后的新对回调持久化（refreshToken 一次性，旧值作废）
@@ -169,7 +169,7 @@ describe("Authenticator (R1 token 续期)", () => {
     );
     expect(getAccessToken).toHaveBeenCalledWith({
       refreshToken: "refresh-0",
-      scope: "GENERAL",
+      scope: "api",
       clientId,
     });
     expect(authenticator.currentRefreshToken).toBe("refresh-via-wsjson");
@@ -312,7 +312,7 @@ describe("RealWsJsonClient × Authenticator（re-login 续期挂点）", () => {
       await waitFor(() => server.messages.length >= 2);
       expect(refreshChannel).toHaveBeenCalledWith({
         refreshToken: "server-refresh",
-        scope: "GENERAL",
+        scope: "api",
         clientId,
       });
       expect(server.messages[1]).toEqual(
@@ -375,7 +375,7 @@ describe("RealWsJsonClient × Authenticator（re-login 续期挂点）", () => {
       // R1 核心：re-login 用的是续期后的新 token，且持久化回调收到新对
       expect(refreshChannel).toHaveBeenCalledWith({
         refreshToken: "day1-refresh",
-        scope: "GENERAL",
+        scope: "api",
         clientId,
       });
       expect(server2.messages[1]).toEqual(

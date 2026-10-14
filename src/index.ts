@@ -6,6 +6,9 @@ export * from "./client/types/alertTypes.js";
 export * from "./client/tdaWsJsonTypes.js";
 export * from "./client/wsJsonClientProxy.js";
 export * from "./client/guard.js";
+export * from "./auth/authenticator.js";
+// Authenticator 是 default export，export * 不带 default——显式补命名导出
+export { default as Authenticator } from "./auth/authenticator.js";
 export * from "./client/messageTypeHelpers.js";
 export * from "./client/services/chartMessageHandler.js";
 export * from "./client/services/quotesMessageHandler.js";
