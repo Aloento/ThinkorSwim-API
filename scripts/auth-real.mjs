@@ -1,7 +1,7 @@
 // 真实账户登录工具 v2（默认无头：F2A 渠道自动选择——优先"Send a mobile
 // notification"手机上点批准，页面自己轮询；无该渠道退回"Text Message"，
 // 验证码在终端回传；自动勾选"信任设备"以签发 refreshToken）。
-// 协议同 auth-guest.mjs（docs/TECHNICAL.md §认证链路）：
+// 协议同 auth-guest.mjs（TECHNICAL.md §认证链路）：
 //   1. https://trade.thinkorswim.com/ 账密登录（sws-gateway），随后 F2A
 //   2. 前端 tsm/authorize → wsjson login/schwab
 //   3. 收割 sessionStorage.token + login/schwab 响应里的 accessTokenInfo

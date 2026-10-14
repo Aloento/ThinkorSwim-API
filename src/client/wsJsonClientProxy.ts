@@ -61,7 +61,7 @@ import { UnsubscribeRequestParams } from "./services/unsubscribeMessageHandler.j
 import { WatchlistCategoriesRequestParams } from "./services/watchlistCategoriesMessageHandler.js";
 import { WatchlistCreateRequestParams } from "./services/watchlistCreateMessageHandler.js";
 import { WatchlistRenameRequestParams } from "./services/watchlistRenameMessageHandler.js";
-// ---- 第五批参数类型（task-13，docs/TECHNICAL.md §第五批接入契约）----
+// ---- 补充服务参数类型----
 import { DisclosuresAcceptRequestParams } from "./services/disclosuresAcceptMessageHandler.js";
 import { FundamentalsCurrentRequestParams } from "./services/fundamentalsCurrentMessageHandler.js";
 import { NewsHeadersGetRequestParams } from "./services/newsHeadersGetMessageHandler.js";
@@ -79,7 +79,7 @@ const logger = debug("wsClientProxy");
 export const ALL_REQUESTS = [
   "authenticateWithAuthCode",
   "authenticateWithAccessToken",
-  // A6（docs/TECHNICAL.md）：optionChainQuotes 曾在 68/78 行重复出现两次，去重
+  // A6：optionChainQuotes 曾在 68/78 行重复出现两次，去重
   "disconnect",
   "reconnect",
   "quotes",
@@ -117,7 +117,7 @@ export const ALL_REQUESTS = [
   "addToWatchlist",
   "removeFromWatchlist",
   "rearrangeWatchlist",
-  // ---- 第四批（task-9）：全部单对象参数，wire 上 args 即参数本体，
+  // ---- 扩展服务：全部单对象参数，wire 上 args 即参数本体，
   // 无需 relaySpread（lead 建议：新门面方法尽量单对象参数）----
   "getStudyCategories",
   "subscribeStudies",
@@ -150,7 +150,7 @@ export const ALL_REQUESTS = [
   "demoAccountSetBalance",
   "demoAccountAdjustCash",
   "logoff",
-  // ---- 第五批（task-13）：全部单对象参数或零参，wire 上 args 即参数本体----
+  // ---- 补充服务：全部单对象参数或零参，wire 上 args 即参数本体----
   "getNews",
   "getFundamentals",
   "getStudies",
@@ -162,7 +162,7 @@ export const ALL_REQUESTS = [
   "getSupportChats",
   "setUserProperties",
   "acceptDisclosures",
-  // ---- 第六批（task-14）----
+  // ---- 事件流批次----
   "subscribeAlerts",
   "orderEvents",
   "observeOrders",
@@ -173,7 +173,7 @@ export type Request = RequestType[number];
 export type ProxiedRequest = {
   request: Request;
   args?: any;
-  /** S1（task-15）：服务端配了 authToken 时随每条消息附带 */
+  /** 鉴权：服务端配了 authToken 时随每条消息附带 */
   token?: string;
 };
 
@@ -181,7 +181,7 @@ export type ProxiedResponse = ProxiedRequest & { response: unknown };
 
 export type WsJsonClientProxyOptions = {
   /**
-   * S1（task-15）：共享 token。设置后随每条消息附带顶层 token 字段，
+   * 鉴权：共享 token。设置后随每条消息附带顶层 token 字段，
    * 与服务端 WsJsonServerProxyOptions.authToken 一致才能通过校验。
    */
   authToken?: string;
@@ -529,7 +529,7 @@ export class WsJsonClientProxy implements WsJsonClient {
     }).promise();
   }
 
-  // ---- 第四批透传（task-9）：全部单对象参数（或零参），直接 dispatch ----
+  // ---- 扩展服务透传：全部单对象参数（或零参），直接 dispatch ----
 
   getStudyCategories(): Promise<ParsedPayloadResponse> {
     return this.dispatch<ParsedPayloadResponse>("getStudyCategories").promise();
@@ -781,7 +781,7 @@ export class WsJsonClientProxy implements WsJsonClient {
     return this.dispatch<ParsedPayloadResponse>("logoff", request).promise();
   }
 
-  // ---- 第五批透传（task-13）：全部单对象参数或零参，直接 dispatch ----
+  // ---- 补充服务透传：全部单对象参数或零参，直接 dispatch ----
 
   getNews(
     request: NewsHeadersGetRequestParams,
@@ -876,7 +876,7 @@ export class WsJsonClientProxy implements WsJsonClient {
     ).iterable();
   }
 
-  /** task-14B：alerts/subscribe 流（args 为 alertTypes 数组或 undefined） */
+  /** alerts/subscribe 流（args 为 alertTypes 数组或 undefined） */
   subscribeAlerts(alertTypes?: string[]): AsyncIterable<ParsedPayloadResponse> {
     return this.dispatch<ParsedPayloadResponse>(
       "subscribeAlerts",
@@ -884,7 +884,7 @@ export class WsJsonClientProxy implements WsJsonClient {
     ).iterable();
   }
 
-  /** task-14A：order_events 原始流（args 单对象 {account, types?}） */
+  /** order_events 原始流（args 单对象 {account, types?}） */
   orderEvents(
     request: OrderEventsRequestParams,
   ): AsyncIterable<ParsedPayloadResponse> {
@@ -894,7 +894,7 @@ export class WsJsonClientProxy implements WsJsonClient {
     ).iterable();
   }
 
-  /** task-14A：归一化事件流。载荷为纯 JSON（无 Date），跨 wire 无需 dateReviver */
+  /** 归一化事件流。载荷为纯 JSON（无 Date），跨 wire 无需 dateReviver */
   observeOrders(account: string): AsyncIterable<NormalizedOrderEvent> {
     return this.dispatch<NormalizedOrderEvent>(
       "observeOrders",
@@ -904,7 +904,7 @@ export class WsJsonClientProxy implements WsJsonClient {
 
   private sendMessage(request: ProxiedRequest) {
     this.ensureConnected();
-    // S1（task-15）：配了 authToken 就随每条消息附带（含 disconnect）。
+    // 鉴权：配了 authToken 就随每条消息附带（含 disconnect）。
     const message =
       this.proxyOptions?.authToken !== undefined
         ? { ...request, token: this.proxyOptions.authToken }

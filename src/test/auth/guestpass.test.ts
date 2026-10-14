@@ -107,7 +107,7 @@ describe("guestpass auth helpers", () => {
   });
 
   it("picks the papermoney datacenter for PaperMoney sessions", () => {
-    // token 与 DC 绑定（docs/TECHNICAL.md F1）：paper 会话必须连 papermoney-services
+    // token 与 DC 绑定（TECHNICAL.md F1）：paper 会话必须连 papermoney-services
     expect(wsUrlForTradingSystem("PaperMoney")).toBe(
       "wss://papermoney-services.schwab.com/Services/WsJson",
     );

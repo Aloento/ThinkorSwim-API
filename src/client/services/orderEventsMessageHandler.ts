@@ -77,8 +77,7 @@ export type OrderEventsSnapshotResponse = {
 
 /**
  * order_events 订阅参数。types 缺省取前端实测集合
- * （本地录制 +23.73s 线上请求帧、
- * scripts/probe-services.mjs 同款）。
+ * （线上实测）。
  */
 export type OrderEventsRequestParams = {
   account: string;
@@ -100,12 +99,8 @@ export const DEFAULT_ORDER_EVENT_TYPES = [
  * "WAIT TRG"/"WAIT STOP"/"WAIT COND"/"WAIT REV"/NONE），枚举成员改用
  * 下划线写法。
  *
- * ⚠️ 证据说明（task-14A"先提取真实值再定，别猜"）：guest 会话的
- * order_events 是空 body snapshot（无订单），place_order 帧也不含
- * order_events 的 status 实测值。本映射表因此以前端 bundle 中
- * 官方归一化函数（cp，20 个 raw wire 值 → 10 个归一值）为准；
- * order_history 实测帧（probe-2026-10-13/order_history.jsonl）的
- * "CANCELED" 与之吻合。注意前端词表没有 "PARTIAL"：部分成交经
+ * 取值来源：前端 bundle 官方归一化函数（20 个 raw wire 值 → 10 个
+ * 归一值）；order_history 线上实测帧的 "CANCELED" 与之吻合。注意前端词表没有 "PARTIAL"：部分成交经
  * eventType=EXECUTION + filledQuantity 表达，status 仍 WORKING。
  */
 export type NormalizedOrderStatus =
@@ -234,7 +229,7 @@ export function normalizeOrderEvent(raw: RawOrderEvent): NormalizedOrderEvent {
 }
 
 /**
- * order_events 订阅（task-14A）。此前"仅注册未派发"（audit-coverage v2）：
+ * order_events 订阅：
  * 服务端在订单状态变化时持续推送 snapshot{orders[]}，header.id 固定为
  * "order_events"（线上实测帧）。重连后随 activeRequests 原样重放。
  */

@@ -1,7 +1,7 @@
 import { Observable } from "obgen";
 
 /**
- * 流式订阅的门面对象（P4，docs/TECHNICAL.md）：包装 dispatch 得到的 Observable，
+ * 流式订阅的门面对象：包装 dispatch 得到的 Observable，
  * 在消费者提前退出（`for await` 的 break / 循环体异常触发协议调用
  * return()/throw()）时回调 onEnd，让客户端回收该订阅的资源：
  * - GenericIncomingMessageHandler.dataStore 补丁基底条目（removeStore）

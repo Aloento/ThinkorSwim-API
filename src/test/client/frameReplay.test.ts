@@ -78,7 +78,7 @@ describe("replay of recorded wire frames", () => {
   });
 
   it("routes error entries with the request id (real W4 cancel-error frame)", () => {
-    // 来自 write-2026-10-13/W4.jsonl 的重复撤单错误帧（手工内联避免跨文件依赖）
+    // 来自线上实测的重复撤单错误帧（手工内联避免跨文件依赖）
     const handler = new GenericIncomingMessageHandler();
     const errorFrame = {
       header: {

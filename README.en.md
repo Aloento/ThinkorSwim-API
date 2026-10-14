@@ -85,22 +85,22 @@ node --env-file=.env dist/example/wsProxyServer.js
 
 ## Capabilities (parity table in TECHNICAL.md §6)
 
-| Domain       | Capabilities |
-| ------------ | ------------ |
-| Auth         | access token / authCode login; `getAccessToken` refresh; `auth_code/get` |
-| Accounts     | accounts / statement / positions / margin calls / disclosures / user properties / order history / tax lots / transaction categories |
-| Quotes       | quote stream & one-shot quotes · candles · market depth · market hours |
-| Options      | option chain · chain quotes · chain details · option statistics |
-| Fundamentals | current/history fundamentals · study catalog (441) · study value subscription |
-| News         | headers / relevant news / body / subscriptions |
-| Screener     | filter & parameters / query |
-| Drawings     | drawing CRUD · drawing sets |
-| Search       | instrument search · analyst reports |
+| Domain       | Capabilities                                                                                                                                          |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Auth         | access token / authCode login; `getAccessToken` refresh; `auth_code/get`                                                                              |
+| Accounts     | accounts / statement / positions / margin calls / disclosures / user properties / order history / tax lots / transaction categories                   |
+| Quotes       | quote stream & one-shot quotes · candles · market depth · market hours                                                                                |
+| Options      | option chain · chain quotes · chain details · option statistics                                                                                       |
+| Fundamentals | current/history fundamentals · study catalog (441) · study value subscription                                                                         |
+| News         | headers / relevant news / body / subscriptions                                                                                                        |
+| Screener     | filter & parameters / query                                                                                                                           |
+| Drawings     | drawing CRUD · drawing sets                                                                                                                           |
+| Search       | instrument search · analyst reports                                                                                                                   |
 | Trading      | LIMIT/MARKET/STOP/STOPLIMIT orders (two-step CONFIRM→SUBMIT internally) · modify/cancel · order event stream (raw + normalized status) · safety guard |
-| Alerts       | create / cancel / lookup / subscribe |
-| Watchlists   | create / rename / delete / add / remove / rearrange |
-| Message ctr  | fetch / subscribe |
-| Other        | subscription cleanup · support chat · demo account top-up (⚠️) · logoff (⚠️) |
+| Alerts       | create / cancel / lookup / subscribe                                                                                                                  |
+| Watchlists   | create / rename / delete / add / remove / rearrange                                                                                                   |
+| Message ctr  | fetch / subscribe                                                                                                                                     |
+| Other        | subscription cleanup · support chat · demo account top-up (⚠️) · logoff (⚠️)                                                                          |
 
 Built into the connection layer: exponential-backoff reconnect, heartbeat watchdog,
 handshake/login timeouts, subscription replay after reconnect; early `break` in

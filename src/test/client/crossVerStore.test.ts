@@ -14,23 +14,23 @@ import {
 } from "../../client/tdaWsJsonTypes";
 
 /**
- * task-16：storeKey-ver 缺陷根治（docs/TECHNICAL.md §3.3 基底跨 ver）。
+ * storeKey-ver 缺陷根治（TECHNICAL.md §3.3 基底跨 ver）。
  *
  * 线上模式（W2 实测）：CONFIRM snapshot ver:1（id=update-draft-order-<SYM>）
  * → 价格 patch ver:1 → SUBMIT patch **ver:0 同 id**（orderId 在
  * /orders/0/orderId）。旧实现 storeKey=service_id_ver，ver:0 patch 找不到
  * ver:1 基底被丢弃，只能靠 submitOrder 的原始帧拦截绕过。
  *
- * 根治语义（Lead 拍板）：同一 service+id 是**同一逻辑文档的演进**——
+ * 根治语义：同一 service+id 是**同一逻辑文档的演进**——
  * - patch 基底查找跨 ver 命中（service+id）；
  * - snapshot 写入时清理同 id 其他 ver 条目（防多基底漂移），store 不变量：
  *   每个 service+id 恰好一条基底，键后缀 = 最后 snapshot 的 ver（诊断用）；
  * - removeStore/clearStores 前缀语义不变。
  */
 
-// ---- 纯 handler 用例：合成跨 ver 帧（任务书指定形状） ----
+// ---- 纯 handler 用例：合成跨 ver 帧 ----
 
-describe("GenericIncomingMessageHandler 跨 ver 基底（task-16）", () => {
+describe("GenericIncomingMessageHandler 跨 ver 基底", () => {
   const wrap = (item: unknown): RawPayloadResponse =>
     ({ payload: [item] }) as RawPayloadResponse;
 
@@ -280,7 +280,7 @@ async function connectClient(
   return { server, client, genericHandler };
 }
 
-describe("submitOrder 统一管道（task-16：绕过移除后跨 ver 合并出 orderId）", () => {
+describe("submitOrder 统一管道（绕过移除后跨 ver 合并出 orderId）", () => {
   afterEach(async () => {
     await jest.advanceTimersByTimeAsync(50);
     jest.useRealTimers();

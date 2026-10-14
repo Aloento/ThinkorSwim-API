@@ -1,15 +1,14 @@
 /**
- * 交易安全闸门（task-14D，阶段 3"guard 进库"）。
+ * 交易安全闸门。
  *
- * 背景：此前 paper-only 闸门只存在于 scripts/probe-write.mjs 工具层
- * （docs/TECHNICAL.md 阶段 3 遗留项）。本模块把它移入库内：RealWsJsonClientOptions
+ * 把此前只存在于 scripts/probe-write.mjs 工具层的 paper-only 闸门移入库内：RealWsJsonClientOptions
  * .guard 配置，confirmOrder/submitOrder/replaceOrder/cancelOrder 四个写
  * 入口前置校验，任一规则不通过抛 GuardError——**默认 undefined = 不启用**，
  * 对既有调用方零行为变化。
  *
  * 校验顺序（从"会话级"到"订单级"，先粗后细）：
  *   1. paperOnly：会话 wsUrl 不含 "papermoney-services" 即拒绝一切写单
- *      （DEFAULT_WS_URL=真实盘，PAPER_WS_URL=模拟盘；判定同任务书）；
+ *      （DEFAULT_WS_URL=真实盘，PAPER_WS_URL=模拟盘）；
  *   2. allowedAccountCodes：draft.accountNumber 必须在白名单内；
  *   3. maxQuantity：|quantity| 上限（quantity 正负=买/卖，同
  *      placeOrderMessageHandler 契约）；

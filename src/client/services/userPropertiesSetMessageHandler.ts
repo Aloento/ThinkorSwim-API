@@ -5,7 +5,7 @@ import WebSocketApiMessageHandler, {
 } from "./webSocketApiMessageHandler.js";
 
 // 存在但未实测成功形状（本地录制
-// user_properties_set.jsonl）：零参数请求也返回 snapshot（空 body），
+// 线上实测）：零参数请求也返回 snapshot（空 body），
 // 但真实写参数的形状待按需探测（bundle 挖掘证据）。
 export type UserPropertiesSetRequestParams = Record<string, unknown>;
 

@@ -3,7 +3,7 @@ import readline from "readline";
 
 const ws = new WebSocket("ws://localhost:8080");
 
-// S1（task-15）：服务端配了 TOS_PROXY_TOKEN 时这里带同名 token。
+// 鉴权：服务端配了 TOS_PROXY_TOKEN 时这里带同名 token。
 const token = process.env.TOS_PROXY_TOKEN;
 
 ws.on("error", console.error);

@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 枚举值全量抄自 本地录制
+// 枚举值全量抄自本地录制
 // 第 2 帧服务端错误帧："Possible enum values are [...]"。
 // 发送集合外的值会导致整条请求报 error。
 const FUNDAMENTALS_FIELDS = [
@@ -57,7 +57,7 @@ const FUNDAMENTALS_FIELDS = [
 
 export type FundamentalsField = (typeof FUNDAMENTALS_FIELDS)[number];
 
-// task-17 实测（本地录制 t17-9）：非法值错误帧
+// 线上实测：非法值错误帧
 // 自曝枚举 "Possible enum values are [QUARTERLY, ANNUAL]"。
 export type FundamentalsTime = "QUARTERLY" | "ANNUAL";
 
@@ -65,7 +65,7 @@ export type FundamentalsTime = "QUARTERLY" | "ANNUAL";
 // $.params.time: must not be null"——两者必传。
 export type FundamentalsCurrentRequestParams = {
   symbol: string;
-  // task-17 实测枚举 [QUARTERLY, ANNUAL]，ANNUAL 实测 snapshot 成功（t17-10）。
+  // 实测枚举 [QUARTERLY, ANNUAL]，ANNUAL 实测 snapshot 成功。
   time: FundamentalsTime;
   fields: FundamentalsField[];
 };

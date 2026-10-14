@@ -4,12 +4,12 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 必填校验抄自 本地录制：
+// 必填校验抄自本地录制：
 // "$.params.refreshToken: must not be null; $.params.scope: must not be
 // null; $.params.clientId: must not be null"。guest 无 refreshToken，成功
 // 帧未实测。
 //
-// token 续期服务在 wsjson 里存在（docs/TECHNICAL.md 第三轮）——结合 login/schwab
+// token 续期服务在 wsjson 里存在（线上实测）——结合 login/schwab
 // 返回的 accessTokenInfo.refreshToken，可替代 REST 续期路径。
 // bundle 枚举名 EXCHANGE_RT_FOR_EAT 佐证语义：refreshToken 换 accessToken。
 
@@ -22,9 +22,7 @@ export type AccessTokenGetRequestParams = {
   clientId: string;
 };
 
-// 响应形状抄自 bundle 校验 schema（本地录制 中
-// access_token/get 的响应 schema：{accessExpiresIn, accessToken,
-// refreshToken}）。
+// 响应形状抄自 bundle 校验 schema（线上实测）。
 export type RawPayloadResponseAccessTokenGet = {
   accessExpiresIn: number;
   accessToken: string;

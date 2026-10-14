@@ -17,7 +17,7 @@ export default class GenericIncomingMessageHandler {
   private readonly dataStore: Record<string, StoredData> = {};
 
   /**
-   * task-16：基底按 **service+id** 命中，与 ver 无关。
+   * 基底按 **service+id** 命中，与 ver 无关。
    *
    * 线上语义（W1/W2 实测）：同一 service+id 是**同一逻辑文档的演进**，
    * ver 只是文档版本号——place_order 草稿 snapshot 是 ver:1，而 SUBMIT 完成
@@ -60,7 +60,7 @@ export default class GenericIncomingMessageHandler {
         const storeKey = `${service}_${id}_${ver}`;
         if (type === RESPONSE_TYPE.SNAPSHOT) {
           const body = (entry.body ?? {}) as StoredData;
-          // task-16：snapshot 是该逻辑文档的新基底——先清掉同 id 其他 ver 的
+          // snapshot 是该逻辑文档的新基底——先清掉同 id 其他 ver 的
           // 旧条目，避免同文档出现多基底各自漂移（旧 ver 条目残留会让后续
           // patch 命中哪条取决于遍历顺序）。
           this.removeStore(service, id);
@@ -95,7 +95,7 @@ export default class GenericIncomingMessageHandler {
   }
 
   /**
-   * P4（docs/TECHNICAL.md）：删除 dataStore 中某 service+id 的全部补丁基底条目
+   * 删除 dataStore 中某 service+id 的全部补丁基底条目
    * （所有 ver）。dataStore 按 `service_id_ver` 只进不出，长连接下（尤其
    * quotes/chart 高频 patch）会无限增长——客户端在订阅生命周期结束
    * （iterable 消费者提前退出 / disconnect）时调用本方法回收。
@@ -141,7 +141,7 @@ export default class GenericIncomingMessageHandler {
       );
       return [];
     }
-    // task-16：跨 ver 命中基底（见 docPrefix 注释）。合并结果写回**基底键**
+    // 跨 ver 命中基底（见 docPrefix 注释）。合并结果写回**基底键**
     // （而非 patch 自身的 ver 键），维持「每文档一条基底」不变量。
     const baseKey = this.findBaseKey(service, id) ?? storeKey;
     const existingObject = this.dataStore[baseKey];

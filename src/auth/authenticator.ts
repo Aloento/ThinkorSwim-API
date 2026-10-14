@@ -1,13 +1,12 @@
-// Authenticator：token 自动续期抽象（R1，docs/TECHNICAL.md 阶段 1）。
+// Authenticator：token 自动续期抽象。
 //
-// 背景：wsjson login/schwab 响应携带 accessTokenInfo.refreshToken（docs/TECHNICAL.md
-// F4），续期通道 access_token/get（refreshToken 换 accessToken）handler 已
+// 背景：wsjson login/schwab 响应携带 accessTokenInfo.refreshToken，续期通道 access_token/get（refreshToken 换 accessToken）handler 已
 // 落地。实测口径：accessToken 约 24h 有效——在 23h 阈值前主动刷新，长连接
 // 会话即可跨天存活。
 //
-// guest 局限（docs/TECHNICAL.md）：guest 会话无 refreshToken，getValidToken() 走直通
+// guest 局限：guest 会话无 refreshToken，getValidToken() 走直通
 // 分支（console.warn 一次，不刷新）——**端到端续期回归需真实账户**（已在
-// docs/TECHNICAL.md 与 README 标注）。
+// TECHNICAL.md 与 README 标注）。
 //
 // 注意：不引用任何 REST 续期通道——grant_type=refresh_token 的 REST 路径未
 // 实测（src/auth/refresh.mjs 不存在），按 YAGNI 不做；wsjson 的
@@ -28,7 +27,7 @@ import { AuthError, ParsedPayloadResponse } from "../client/tdaWsJsonTypes.js";
 import { RawPayloadResponseAccessTokenGet } from "../client/services/accessTokenGetMessageHandler.js";
 import type { WsJsonClient } from "../client/wsJsonClient.js";
 
-/** accessToken 有效期约 24h，提前 1h 视为到期（实测口径，docs/TECHNICAL.md）。 */
+/** accessToken 有效期约 24h，提前 1h 视为到期（实测口径）。 */
 export const DEFAULT_TOKEN_TTL_MS = 23 * 60 * 60 * 1000;
 
 /**

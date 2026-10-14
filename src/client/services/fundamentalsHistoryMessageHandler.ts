@@ -8,7 +8,7 @@ import WebSocketApiMessageHandler, {
 // exp-fund-hist3.mjs guest paper 逐字段扫描，2026-10-14）：
 // 参数仅 {symbol, fields}——**没有 time**：bundle 调用点里的 time 是前端网关
 // 层剥掉的，线协议直接拒（`Mismatched request parameter name is "params.time"`，
-// 见 probe-2026-10-13/fundamentals_history.jsonl 三帧 + 本轮复测）。
+// 见线上实测三帧）。
 // fields 必填非空，且只收 21 个 historical 字段（current 45 枚举的真子集，
 // 集合外报 "Non historical field requested: X"）。
 export const FUNDAMENTALS_HISTORY_FIELDS = [

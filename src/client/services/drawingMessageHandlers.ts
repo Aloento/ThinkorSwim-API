@@ -4,11 +4,11 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 图表画线服务全套（docs/TECHNICAL.md 第三轮：drawing/create、drawing/update、
+// 图表画线服务全套（线上实测：drawing/create、drawing/update、
 // drawing/delete、drawing_set/create、drawing_set/delete）。
 //
 // 参数双证据：
-// 1) 校验帧（drawing_create.jsonl / drawing_set_create.jsonl）：
+// 1) 校验帧（线上实测）：
 //    drawing/create     "$.params.drawingSetGuid: must not be blank;
 //                        $.params.drawing: must not be null"
 //    drawing_set/create "$.params.symbol: must not be blank;

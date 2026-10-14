@@ -5,7 +5,7 @@ import WebSocketApiMessageHandler, {
 } from "./webSocketApiMessageHandler.js";
 
 // 模拟盘（demo account）资金操作。参数双证据：
-// 1) 校验帧（demo_account_set_balance.jsonl / demo_account_adjust_cash.jsonl）：
+// 1) 校验帧（线上实测）：
 //    set_balance   "$.params.accountCode: must not be null"
 //    adjust_cash   "$.params.accountCode: must not be null;
 //                   $.params.cashAmount: must not be null"

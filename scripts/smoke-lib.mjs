@@ -1,6 +1,6 @@
 // 端到端冒烟：用编译后的库 API（RealWsJsonClient）跑 guest paper 会话。
 // 前置：pnpm build 且 scripts/.env.blackbox 有 TOS_GUEST_ACCESS_TOKEN（过期则先跑 auth-guest.mjs）。
-// 验证门面方法在真实服务器上的行为：login→accounts→statement→market_hours→quotes→watchlist→第四批(study/scan/quotes/get)→第五批(news/fundamentals/order_history)。
+// 验证门面方法在真实服务器上的行为：login→accounts→statement→market_hours→quotes→watchlist→扩展服务(study/scan/quotes/get)→补充服务(news/fundamentals/order_history)。
 import { config } from "dotenv";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -113,7 +113,7 @@ try {
   console.log("[smoke] watchlist/delete:", del.service, "ok");
 }
 
-// 第四批门面冒烟（guest 实测可达，lead 已在裸 ws 层验证三条全通）：
+// 扩展服务门面冒烟（guest 实测可达，lead 已在裸 ws 层验证三条全通）：
 // study/categories / scan_filter/get / quotes/get。
 // ⚠️ 绝不在冒烟里调用 logoff / demo_account_*——终结会话、破坏性资金操作。
 const studyCats = await client.getStudyCategories();
@@ -145,7 +145,7 @@ if (!firstItem?.values) {
   process.exit(1);
 }
 
-// 第五批门面冒烟（task-13，guest 实测可达三条，均有 probe-2026-10-13 成功帧）：
+// 补充服务门面冒烟：
 // news_headers/get / fundamentals/current / order_history。
 const news = await client.getNews({ symbol: "AAPL", limit: 3 });
 const newsCount = news.body.news?.length ?? 0;
@@ -202,7 +202,7 @@ if (!Array.isArray(history.body.orderHistoryEntries)) {
   process.exit(1);
 }
 
-// 第六批（task-14）：order_events / alerts/subscribe 订阅帧往返。
+// 事件流批次：order_events / alerts/subscribe 订阅帧往返。
 // guest 无成交订单——probe 实测 order_events 返回空 body snapshot，断言"帧可达"即可。
 const firstFrame = async (iterable, ms) => {
   const it = iterable[Symbol.asyncIterator]();
@@ -234,7 +234,7 @@ console.log(
     : `service=${al.value?.service}`,
 );
 
-// 第八批（task-17）：study/subscribe 修通断言——studies 元素必填
+// 第八批：study/subscribe 修通断言——studies 元素必填
 // aggregationPeriod，实测 snapshot {values:{SYMBOL:{studyName:num}}}。
 const studyFrame = await firstFrame(
   client.subscribeStudies({

@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 必填校验抄自 本地录制：
+// 必填校验抄自本地录制：
 // "$.params.issuedTo: must not be blank; $.params.refreshToken: must not
 // be blank; $.params.appliesTo: must not be blank"。guest 无 refreshToken，
 // 成功帧未实测。

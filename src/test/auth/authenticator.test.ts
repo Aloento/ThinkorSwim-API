@@ -17,7 +17,7 @@ import { AuthError } from "../../client/tdaWsJsonTypes";
  * socketFactory 模式（jest-websocket-mock 接管全局 WebSocket）。
  *
  * guest 局限：guest 会话无 refreshToken，端到端续期不可验证——直通分支
- * （warn 一次）在单测覆盖，真实账户回归项已标注 docs/TECHNICAL.md 与 README。
+ * （warn 一次）在单测覆盖，真实账户回归项已标注 TECHNICAL.md 与 README。
  */
 
 const clientId = "TOSWeb";
@@ -214,7 +214,7 @@ describe("Authenticator (R1 token 续期)", () => {
   });
 });
 
-// ---- 客户端集成（task-12 要点 2：re-login 前挂 getValidToken） ----
+// ---- 客户端集成（要点 2：re-login 前挂 getValidToken） ----
 
 const WS_URL = "ws://localhost:9910";
 

@@ -7,12 +7,12 @@ import WebSocketApiMessageHandler, {
 export type StudiesGetRequestParams = {
   // 必须是非空的**真实研究名**（如 "SimpleMovingAvg"）。
   // 简写（"SMA"）实测报 error "No study with name: SMA,VOL"
-  // （本地录制 第 2 帧）；
+  // （线上实测）；
   // 空数组报 "$.params.studies: must not be empty"（第 1 帧）。
   studies: string[];
 };
 
-// plot 结构实测自 studies_get.jsonl 第 3 帧（snapshot）。
+// plot 结构实测自线上 snapshot 帧。
 // plotSettings（paintingStyles/curveStyles/defaultValue 等）结构庞大且稳定，
 // 按需读取，不逐字段建模。
 export type StudyPlotJTOS = {

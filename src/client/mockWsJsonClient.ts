@@ -56,7 +56,7 @@ import { UnsubscribeRequestParams } from "./services/unsubscribeMessageHandler.j
 import { WatchlistCategoriesRequestParams } from "./services/watchlistCategoriesMessageHandler.js";
 import { WatchlistCreateRequestParams } from "./services/watchlistCreateMessageHandler.js";
 import { WatchlistRenameRequestParams } from "./services/watchlistRenameMessageHandler.js";
-// ---- 第五批参数类型（task-13，docs/TECHNICAL.md §第五批接入契约）----
+// ---- 补充服务参数类型----
 import { DisclosuresAcceptRequestParams } from "./services/disclosuresAcceptMessageHandler.js";
 import { FundamentalsCurrentRequestParams } from "./services/fundamentalsCurrentMessageHandler.js";
 import { NewsHeadersGetRequestParams } from "./services/newsHeadersGetMessageHandler.js";
@@ -453,7 +453,7 @@ export default class MockWsJsonClient implements WsJsonClient {
     });
   }
 
-  // ---- 第四批 fixture（与真实响应骨架一致，字段取保守空值）----
+  // ---- 扩展服务 fixture（与真实响应骨架一致，字段取保守空值）----
 
   getStudyCategories(): Promise<ParsedPayloadResponse> {
     return Promise.resolve({
@@ -708,7 +708,7 @@ export default class MockWsJsonClient implements WsJsonClient {
     return Promise.resolve({ service: "logoff/schwab", body: {} });
   }
 
-  // ---- 第五批 mock（docs/TECHNICAL.md §第五批接入契约，task-13）----
+  // ---- 补充服务 mock----
 
   getNews(_: NewsHeadersGetRequestParams): Promise<ParsedPayloadResponse> {
     return Promise.resolve({

@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 成功帧实测自 本地录制
+// 成功帧实测自本地录制
 // （type: snapshot）。响应四类分组：STOCK/OPTION/FUNDAMENTAL 为 filters[]
 // （人类可读筛选器名），STUDY 为 studies{分类名: 研究名[]}。
 export type ScanFiltersByType = {

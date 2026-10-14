@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 枚举值全量抄自 本地录制
+// 枚举值全量抄自本地录制
 // 第 3 帧服务端错误帧："Possible enum values are [...]"。
 // 发送集合外的值会导致整条请求报 error。
 const ORDER_ENTRY_FIELDS = [
@@ -60,7 +60,7 @@ const ORDER_ENTRY_FIELDS = [
 
 export type OrderHistoryEntryField = (typeof ORDER_ENTRY_FIELDS)[number];
 
-// 服务端校验（order_history.jsonl 第 1/4/5/6 帧错误帧）：
+// 服务端校验（线上错误帧）：
 //  - 必须提供 startTime+endTime 时间对，或 orderId；
 //  - orderEntryFields 与 legFields 至少一个非空；
 //  - 窗口 ≤ 370 天（含两端），startTime 不得晚于当前时间；

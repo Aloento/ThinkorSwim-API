@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 实测自 本地录制：
+// 实测自本地录制：
 // 可用参数集合为 [symbol, limit]（"params.symbols" 报 error，见第 1 帧）。
 export type NewsHeadersGetRequestParams = {
   symbol: string;

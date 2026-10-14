@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 枚举值全量抄自 本地录制
+// 枚举值全量抄自本地录制
 // 第 2 帧服务端错误帧："Possible enum values are [...]"。
 const TAX_LOT_FIELDS = [
   "SYMBOL",
@@ -25,7 +25,7 @@ const TAX_LOT_FIELDS = [
 
 export type TaxLotField = (typeof TAX_LOT_FIELDS)[number];
 
-// 服务端校验（tax_lot_get.jsonl 第 1/3 帧错误帧）：
+// 服务端校验（线上错误帧）：
 //  - taxLotFields 不得为空；
 //  - refreshToken 不得为空串（blank）；
 //  - guest 会话报 "Account lots lookup is not allowed for the current

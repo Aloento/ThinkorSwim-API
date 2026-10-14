@@ -56,7 +56,7 @@ import { UnsubscribeRequestParams } from "./services/unsubscribeMessageHandler.j
 import { WatchlistCategoriesRequestParams } from "./services/watchlistCategoriesMessageHandler.js";
 import { WatchlistCreateRequestParams } from "./services/watchlistCreateMessageHandler.js";
 import { WatchlistRenameRequestParams } from "./services/watchlistRenameMessageHandler.js";
-// ---- 第五批参数类型（task-13，docs/TECHNICAL.md §第五批接入契约）----
+// ---- 补充服务参数类型----
 import { DisclosuresAcceptRequestParams } from "./services/disclosuresAcceptMessageHandler.js";
 import { FundamentalsCurrentRequestParams } from "./services/fundamentalsCurrentMessageHandler.js";
 import { NewsHeadersGetRequestParams } from "./services/newsHeadersGetMessageHandler.js";
@@ -75,7 +75,7 @@ export interface WsJsonClient extends Disposable {
 
   authenticateWithAccessToken(args: {
     accessToken: string;
-    /** refreshToken 可选：guest 路径没有 refresh token（docs/TECHNICAL.md） */
+    /** refreshToken 可选：guest 路径没有 refresh token */
     refreshToken?: string;
   }): Promise<RawLoginResponseBody | null>;
 
@@ -95,7 +95,7 @@ export interface WsJsonClient extends Disposable {
 
   accountPositions(accountNumber: string): AsyncIterable<ParsedPayloadResponse>;
 
-  /** accountPositions 的语义别名（docs/TECHNICAL.md：门面统一 get* 命名） */
+  /** accountPositions 的语义别名（TECHNICAL.md：门面统一 get* 命名） */
   getPositions(accountNumber: string): AsyncIterable<ParsedPayloadResponse>;
 
   chart(request: ChartRequestParams): AsyncIterable<ParsedPayloadResponse>;
@@ -105,17 +105,17 @@ export interface WsJsonClient extends Disposable {
   lookupAlerts(): AsyncIterable<ParsedPayloadResponse>;
 
   /**
-   * alerts/subscribe：告警事件流（task-14B）。alertTypes 缺省
+   * alerts/subscribe：告警事件流。alertTypes 缺省
    * DEFAULT_ALERT_TYPES（CHANGED/TRIGGERED/EXPIRED/MULTIPLE_EXPIRED）。
    */
   subscribeAlerts(alertTypes?: string[]): AsyncIterable<ParsedPayloadResponse>;
 
-  /** order_events 原始事件流（task-14A）：body.orders[] 为 wire 原样 */
+  /** order_events 原始事件流：body.orders[] 为 wire 原样 */
   orderEvents(
     request: OrderEventsRequestParams,
   ): AsyncIterable<ParsedPayloadResponse>;
 
-  /** 归一化订单事件流（task-14A）：orders[] 逐条展平 + status 归一 */
+  /** 归一化订单事件流：orders[] 逐条展平 + status 归一 */
   observeOrders(account: string): AsyncIterable<NormalizedOrderEvent>;
 
   optionChain(symbol: string): Promise<ParsedPayloadResponse>;
@@ -172,7 +172,7 @@ export interface WsJsonClient extends Disposable {
 
   watchlist(watchlistId: number): Promise<ParsedPayloadResponse>;
 
-  // ---- 账户域（docs/TECHNICAL.md，probe-2026-10-13 实测背书）----
+  // ---- 账户域（TECHNICAL.md 实测背书）----
 
   getAccounts(): Promise<ParsedPayloadResponse>;
 
@@ -192,7 +192,7 @@ export interface WsJsonClient extends Disposable {
   /** message_center/subscribe：实测零参数，返回持续推送 */
   subscribeMessageCenter(): AsyncIterable<ParsedPayloadResponse>;
 
-  // ---- 自选列表（write-2026-10-13 W5 系列实测）----
+  // ---- 自选列表（scripts/probe-write.mjs W5 系列实测）----
 
   getWatchlists(
     request: WatchlistCategoriesRequestParams,
@@ -226,8 +226,8 @@ export interface WsJsonClient extends Disposable {
     symbols: string[],
   ): Promise<ParsedPayloadResponse>;
 
-  // ---- 第四批（docs/TECHNICAL.md §"第四批接入契约"，task-8 handler 全量接入）----
-  // 一次性 Promise 型走 dispatchOneShot（task-6 语义：断线 reject 不重放）。
+  // ---- 扩展服务----
+  // 一次性 Promise 型走 dispatchOneShot（语义：断线 reject 不重放）。
 
   /** study/categories：研究指标目录（26 分类/441 研究，实测成功帧） */
   getStudyCategories(): Promise<ParsedPayloadResponse>;
@@ -368,7 +368,7 @@ export interface WsJsonClient extends Disposable {
    */
   logoff(request: LogoffSchwabRequestParams): Promise<ParsedPayloadResponse>;
 
-  // ---- 第五批（docs/TECHNICAL.md §"第五批接入契约"，task-5/2 批次 11 个 handler 收尾）----
+  // ---- 补充服务----
 
   /** news_headers/get：新闻标题 snapshot（实测参数 [symbol, limit?]） */
   getNews(request: NewsHeadersGetRequestParams): Promise<ParsedPayloadResponse>;

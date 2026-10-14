@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 成功帧实测自 本地录制
+// 成功帧实测自本地录制
 // （type: snapshot）：{uuid, accessToken, grantType, refreshIntervalMillis}
 // ——分析师报告第三方服务的访问 token，零参数。
 export type RawPayloadResponseAnalystReportsToken = {

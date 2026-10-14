@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 客服聊天全套（docs/TECHNICAL.md 第 4 节：bundle 中确认存在）。参数逐字抄自前端
+// 客服聊天全套（TECHNICAL.md §6：bundle 中确认存在）。参数逐字抄自前端
 // bundle（本地录制）调用点：
 //   chat/create            params:{channel, newChatName, body}
 //                          响应 {succeeded, chatRoom:{chatId,name,status,

@@ -8,7 +8,7 @@ import WebSocketApiMessageHandler, {
 //   {header:{service:"logoff/schwab",id:"logoff/schwab",ver:0},
 //    params:{clientId:t, refreshToken:r}}
 // bundle 响应校验只声明 {service, requestId}——预期为终止服务端会话的
-// 确认帧。⚠️ 06 第三轮：会终止会话，勿乱测。
+// 确认帧。⚠️ 会终止会话，勿乱测。
 export type LogoffSchwabRequestParams = {
   clientId: string;
   refreshToken: string;

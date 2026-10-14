@@ -5,10 +5,10 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 订单类型（网页版下单面板全集；guest 实测覆盖见 docs/TECHNICAL.md §3 第六轮）。
+// 订单类型（网页版下单面板全集；guest 实测覆盖见 TECHNICAL.md §5.2）。
 // 服务端错误帧自曝可用值的教训（chart handler 注释）：只发该类型必要的键。
 //
-// ⚠️ 实测（write-2026-10-14/W9b.jsonl）：wire 上 orderType 枚举为
+// ⚠️ 实测（线上实测）：wire 上 orderType 枚举为
 // [CANCEL, MARKET, LIMIT, STOP, STOPLIMIT, TRAILSTOP, TRAILSTOPLIMIT,
 // WALK_LIMIT, MOC, LOC, EXERCISE, AMOUNT, CONVERSION, ROLL_OPEN,
 // ROLL_CLOSE, CLOSE, DIRECT_DEAL, RAQ, NET_DEBIT, NET_CREDIT]
@@ -25,7 +25,7 @@ const WIRE_ORDER_TYPE: Record<OrderType, string> = {
 };
 
 // 有效期限（tif）。实测枚举来自 CONFIRM snapshot 的 orders[].tifs.values
-// （write-2026-10-14/W8.jsonl）：["DAY","GTC","EXT","GTC_EXT","AM","PM"]
+// （线上实测）：["DAY","GTC","EXT","GTC_EXT","AM","PM"]
 // ——此前推测的 WEEK/EXTENDED 不存在于该枚举。
 export type OrderTif = "DAY" | "GTC" | "EXT" | "GTC_EXT" | "AM" | "PM";
 

@@ -12,7 +12,7 @@ import { PlaceLimitOrderRequestParams } from "../../client/services/placeOrderMe
 import { ReplaceOrderRequestParams } from "../../client/services/submitOrderMessageHandler";
 
 /**
- * task-14D：guard 安全闸门拦截矩阵。默认（未配置 guard）零行为变化；
+ * guard 安全闸门拦截矩阵。默认（未配置 guard）零行为变化；
  * 命中规则以 Promise rejection（GuardError）报告——与写门面的 Promise
  * 语义一致，且失败发生在 sendMessage 之前（server 收不到任何帧）。
  *
@@ -118,7 +118,7 @@ const replaceDraft: ReplaceOrderRequestParams = {
   refOrderId: 5411072868,
 };
 
-describe("guard 安全闸门（task-14D 拦截矩阵）", () => {
+describe("guard 安全闸门（拦截矩阵）", () => {
   afterEach(async () => {
     await jest.advanceTimersByTimeAsync(50);
     jest.useRealTimers();

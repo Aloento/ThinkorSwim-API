@@ -10,7 +10,7 @@ import { MarketDepthResponse } from "../client/services/marketDepthMessageHandle
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import Authenticator from "../auth/authenticator.js";
 
-/** login/schwab 走的是 TOSWeb 客户端（docs/TECHNICAL.md）；access_token/get 同口径 */
+/** login/schwab 走的是 TOSWeb 客户端；access_token/get 同口径 */
 const REAL_CLIENT_ID = "TOSWeb";
 
 const logger = debug("testapp");
@@ -154,7 +154,7 @@ class TestApp {
   }
 
   async smoke() {
-    // docs/TECHNICAL.md 冒烟路径：getAccounts → getStatement → quotes
+    // TECHNICAL.md 冒烟路径：getAccounts → getStatement → quotes
     logger(" --- smoke() getAccounts ---");
     const accounts = await this.client.getAccounts();
     logger("getAccounts() %O", accounts);
@@ -170,9 +170,9 @@ class TestApp {
 }
 
 async function run() {
-  // guest 冒烟路径（docs/TECHNICAL.md）：scripts/auth-guest.mjs 把
+  // guest 冒烟路径：scripts/auth-guest.mjs 把
   // TOS_GUEST_ACCESS_TOKEN（可选 TOS_GUEST_WS_URL）写入 .env.blackbox，
-  // paper token 必须连 papermoney 数据中心（docs/TECHNICAL.md F1）。
+  // paper token 必须连 papermoney 数据中心（TECHNICAL.md F1）。
   const guestToken = process.env.TOS_GUEST_ACCESS_TOKEN;
   if (guestToken) {
     const client = new RealWsJsonClient({
@@ -211,7 +211,7 @@ async function run() {
     const authCode = await getAuthCode(username, password);
     await client.authenticateWithAuthCode(authCode);
     storeTokenInDotEnvFile(client.accessToken!, client.refreshToken!);
-    // login/schwab 响应带回的 refreshToken（docs/TECHNICAL.md F4）同样挂上续期器
+    // login/schwab 响应带回的 refreshToken（TECHNICAL.md F4）同样挂上续期器
     client.setAuthenticator(
       new Authenticator({
         clientId: process.env.TOS_CLIENT_ID ?? REAL_CLIENT_ID,

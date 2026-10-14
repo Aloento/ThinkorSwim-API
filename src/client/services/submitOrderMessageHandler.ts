@@ -19,7 +19,7 @@ export type ReplaceOrderRequestParams = PlaceOrderRequestParams & {
 
 // 提交订单草稿（新单）或修改已存在的订单（带 refOrderId）。
 //
-// 实测（scripts/probe-write.mjs W2/W3 用例，docs/TECHNICAL.md 第 3 节）：
+// 实测（scripts/probe-write.mjs W2/W3 用例）：
 // - 新单（W2）：action=SUBMIT ver=0，header 必须复用 CONFIRM 的草稿 id
 //   （update-draft-order-<SYMBOL>）；换 id 报
 //   "Can not submit while prices are not available!"。
@@ -29,7 +29,7 @@ export type ReplaceOrderRequestParams = PlaceOrderRequestParams & {
 //   edit-order-<SYMBOL>（编辑不是草稿续写，不要求复用下单草稿 id），
 //   订单条目 requestType=EDIT_ORDER 且携带 refOrderId。
 // orderType/limitPrice/stopPrice/tif 与 CONFIRM 共用 buildPlaceOrderEntry
-// （MARKET/STOP/STOP_LIMIT 扩展，task-10）；SUBMIT 缺省 tif=DAY +
+// （MARKET/STOP/STOP_LIMIT 扩展）；SUBMIT 缺省 tif=DAY +
 // tag=TOSWeb（W2 实测形状）。
 // ⚠️ MARKET 单 SUBMIT 会立即成交——下单前确认。
 export default class SubmitOrderMessageHandler implements WebSocketApiMessageHandler<PlaceOrderRequestParams> {

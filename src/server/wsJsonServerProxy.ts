@@ -10,13 +10,13 @@ import { Disposable } from "./disposable.js";
 
 const logger = debug("wsJsonServerProxy");
 
-// S3（task-15）：request 白名单——客户端可发任意 JSON，switch 未命中的
+// 安全：request 白名单——客户端可发任意 JSON，switch 未命中的
 // request 此前被静默吞掉（客户端 promise 永挂）。改为显式回错。
 const REQUEST_SET: ReadonlySet<string> = new Set<string>(ALL_REQUESTS);
 
 export type WsJsonServerProxyOptions = {
   /**
-   * S1（task-15）：共享 token 鉴权。设置后每条客户端消息必须携带相同的
+   * 鉴权：共享 token。设置后每条客户端消息必须携带相同的
    * 顶层 `token` 字段（WsJsonClientProxy 配了 authToken 会自动附带），
    * 不匹配回 `{error:"unauthorized"}` 并断开连接。未设置保持旧行为
    * （无鉴权）——本地代理默认信任本机，生产/多用户机器建议设置。
@@ -69,7 +69,7 @@ export default class WsJsonServerProxy implements Disposable {
       this.disconnect();
       return;
     }
-    // S3：request 白名单——未知方法回错（保持连接，客户端可继续）。
+    // 安全：request 白名单——未知方法回错（保持连接，客户端可继续）。
     if (typeof request !== "string" || !REQUEST_SET.has(request)) {
       this.downstream.send(JSON.stringify({ error: "unknown request" }));
       return;
@@ -99,7 +99,7 @@ export default class WsJsonServerProxy implements Disposable {
       case "subscribeOptionsStatistics":
       case "subscribeGlobalChats":
         return await this.relayIterable(msg);
-      // 单参/零参方法 → relayPromise 单参分发；第四批（task-9）方法
+      // 单参/零参方法 → relayPromise 单参分发；扩展服务方法
       // 全部单对象参数，直接并入本组（双参方法才走 relaySpread）。
       case "createAlert":
       case "cancelAlert":
@@ -161,7 +161,7 @@ export default class WsJsonServerProxy implements Disposable {
       case "getSupportChats":
       case "setUserProperties":
       case "acceptDisclosures":
-        // 第五批（task-13）门面方法全部单对象参数或零参，并入本组。
+        // 补充服务门面方法全部单对象参数或零参，并入本组。
         return await this.relayPromise(msg);
       case "addToWatchlist":
       case "removeFromWatchlist":

@@ -14,7 +14,7 @@ import {
 } from "./messageTypeHelpers.js";
 import ResponseParser from "./responseParser.js";
 import SubscriptionStream from "./subscriptionStream.js";
-// ---- 第四批 handler 与其参数类型（task-8，docs/TECHNICAL.md §第四批接入契约）----
+// ---- 扩展服务 handler 与其参数类型----
 import AccessTokenGetMessageHandler, {
   AccessTokenGetRequestParams,
 } from "./services/accessTokenGetMessageHandler.js";
@@ -163,7 +163,7 @@ import WatchlistRenameMessageHandler, {
 import WatchlistRearrangeMessageHandler from "./services/watchlistRearrangeMessageHandler.js";
 import WebSocketApiMessageHandler from "./services/webSocketApiMessageHandler.js";
 import WorkingOrdersMessageHandler from "./services/workingOrdersMessageHandler.js";
-// ---- 第五批 handler 与其参数类型（task-13，docs/TECHNICAL.md §第五批接入契约）----
+// ---- 补充服务 handler 与其参数类型----
 import ChatGlobalMessagesMessageHandler from "./services/chatGlobalMessagesMessageHandler.js";
 import DisclosuresAcceptMessageHandler, {
   DisclosuresAcceptRequestParams,
@@ -223,7 +223,7 @@ export enum ChannelState {
 const logger = debug("realWsJsonClient");
 
 /**
- * task-16：SUBMIT 完成帧（跨 ver patch 合并后）的 orderId 在
+ * SUBMIT 完成帧（跨 ver patch 合并后）的 orderId 在
  * `body.orders[0].orderId`；草稿期该字段是占位 0（W1/W2 实测），
  * 因此「orderId > 0」即终态帧判据。
  */
@@ -239,7 +239,7 @@ const messageHandlers: WebSocketApiMessageHandler<never>[] = [
   new CreateAlertMessageHandler(),
   new AlertLookupMessageHandler(),
   new SubscribeToAlertMessageHandler(),
-  // task-14C：workingOrders 此前 new 局部 handler（绕过查表），现注册后
+  // workingOrders 此前 new 局部 handler（绕过查表），现注册后
   // 统一走 dispatchHandler（与其余门面一致）。
   new WorkingOrdersMessageHandler(),
   new OptionQuotesMessageHandler(),
@@ -273,7 +273,7 @@ const messageHandlers: WebSocketApiMessageHandler<never>[] = [
   new WatchlistAddMessageHandler(),
   new WatchlistRemoveMessageHandler(),
   new WatchlistRearrangeMessageHandler(),
-  // ---- 第四批（task-9）：全部 31 个 handler 注册（dispatchOneShot/
+  // ---- 扩展服务：全部 31 个 handler 注册（dispatchOneShot/
   // dispatchHandler 经 findByTypeOrThrow 查表，漏注册 = 运行时抛错）----
   new StudyCategoriesMessageHandler(),
   new StudySubscribeMessageHandler(),
@@ -306,7 +306,7 @@ const messageHandlers: WebSocketApiMessageHandler<never>[] = [
   new DemoAccountSetBalanceMessageHandler(),
   new DemoAccountAdjustCashMessageHandler(),
   new LogoffSchwabMessageHandler(),
-  // ---- 第五批（task-13）：11 个漏接 handler 全量注册（同样经
+  // ---- 补充服务：11 个漏接 handler 全量注册（同样经
   // findByTypeOrThrow 查表，漏注册 = 运行时抛错）----
   new NewsHeadersGetMessageHandler(),
   new FundamentalsCurrentMessageHandler(),
@@ -356,7 +356,7 @@ export type RealWsJsonClientOptions = {
    */
   autoUnsubscribe?: boolean;
   /**
-   * 交易安全闸门（task-14D）：confirmOrder/submitOrder/replaceOrder/
+   * 交易安全闸门：confirmOrder/submitOrder/replaceOrder/
    * cancelOrder 入口前置校验，不通过抛 GuardError。默认 undefined =
    * 不启用（零行为变化）。paperOnly 判定本会话 wsUrl 是否
    * papermoney-services 端点，详见 src/client/guard.ts。
@@ -389,7 +389,7 @@ export class RealWsJsonClient implements WsJsonClient {
    * accessToken（跨 24h 的重连不会拿旧 token 去登录）。
    */
   private authenticator?: Authenticator;
-  /** 交易安全闸门（task-14D）；未配置 guard 时为 undefined = 不启用 */
+  /** 交易安全闸门；未配置 guard 时为 undefined = 不启用 */
   private readonly guard?: OrderGuard;
   /** 本轮 authenticate() 是否正在等 refresh（防 close 竞态的迟到续发登录帧） */
   private loginAttemptId = 0;
@@ -589,7 +589,7 @@ export class RealWsJsonClient implements WsJsonClient {
       new TransportError(`Connection lost before login completed: ${reason}`),
     );
     // 一次性（promise 型）等待者：断开即 reject，重发重试是调用方的事
-    // （task-16：SUBMIT 完成帧的等待者走通用一次性管道，drainOneShots 已覆盖，
+    // （SUBMIT 完成帧的等待者走通用一次性管道，drainOneShots 已覆盖，
     // 旧的 pendingSubmissions 专用排空随原始帧拦截一起删除）
     this.drainOneShots(`Connection lost: ${reason}`);
     const canRecover =
@@ -632,7 +632,7 @@ export class RealWsJsonClient implements WsJsonClient {
       } else if (isSchwabLoginResponse(message)) {
         this.handleSchwabLoginResponse(message);
       } else {
-        // task-16：全部业务帧走通用解析管道（旧的 SUBMIT 完成帧原始拦截
+        // 全部业务帧走通用解析管道（旧的 SUBMIT 完成帧原始拦截
         // 已删除——storeKey 现在按 service+id 跨 ver 命中基底，ver:0 的
         // orderId patch 能正常合并进 ver:1 草稿基底）。
         const parsedResponse = responseParser.parseResponse(message);
@@ -661,7 +661,7 @@ export class RealWsJsonClient implements WsJsonClient {
         this.sendAccessTokenLogin(accessToken);
         return;
       }
-      // R1：re-login（含 task-6 重连路径）前经 authenticator 拿有效 token。
+      // re-login（含重连路径）前经 authenticator 拿有效 token。
       // refresh 是异步的（access_token/get 走当前连接），期间的断连由
       // attemptId 守卫丢弃迟到的登录帧，避免旧会话 token 打进新会话。
       const attemptId = ++this.loginAttemptId;
@@ -908,7 +908,7 @@ export class RealWsJsonClient implements WsJsonClient {
     this.bufferEnded = true;
     // This ensures that listeners will resolve the promise cleanly from any `for await` loops
     this.buffer.end();
-    // P4（docs/TECHNICAL.md）：整个会话终结、所有流消费者随之退出——全量回收
+    // 整个会话终结、所有流消费者随之退出——全量回收
     // dataStore 补丁基底。重连恢复路径不走这里（消费者还活着，基底要留给
     // 重放后的增量 patch）。
     this.responseParser.clearStores();
@@ -967,10 +967,9 @@ export class RealWsJsonClient implements WsJsonClient {
   }
 
   /**
-   * alerts/subscribe 告警事件流（task-14B，03 A4 复开口）：handler 早已
-   * 存在但只注册未派发（audit-coverage v2 证伪了"已接入"的记载）。
-   * alertTypes 缺省 DEFAULT_ALERT_TYPES（CHANGED/TRIGGERED/EXPIRED/
-   * MULTIPLE_EXPIRED），实测帧见 本地录制。
+   * alerts/subscribe 告警事件流：alertTypes 缺省
+   * DEFAULT_ALERT_TYPES（CHANGED/TRIGGERED/EXPIRED/MULTIPLE_EXPIRED），
+   * 服务端在告警状态变化时持续推送 snapshot 帧。
    */
   subscribeAlerts(
     alertTypes: string[] = DEFAULT_ALERT_TYPES,
@@ -1015,7 +1014,7 @@ export class RealWsJsonClient implements WsJsonClient {
   }
 
   workingOrders(accountNumber: string): AsyncIterable<ParsedPayloadResponse> {
-    // task-14C：改查表派发（此前 new 局部 handler，风格分裂；handler 类
+    // 改查表派发（此前 new 局部 handler，风格分裂；handler 类
     // 无状态，两种写法运行时等价）。
     return this.dispatchHandler(
       WorkingOrdersMessageHandler,
@@ -1024,7 +1023,7 @@ export class RealWsJsonClient implements WsJsonClient {
   }
 
   /**
-   * order_events 原始事件流（task-14A）：body.orders[] 为 wire 原样事件
+   * order_events 原始事件流：body.orders[] 为 wire 原样事件
    * （RawOrderEvent[]，patch 已在 dataStore 合并进 snapshot 基底）。
    * 需要稳定状态枚举用 observeOrders()。
    */
@@ -1035,7 +1034,7 @@ export class RealWsJsonClient implements WsJsonClient {
   }
 
   /**
-   * 归一化订单事件流（task-14A）：每条 order_events 响应里的 orders[]
+   * 归一化订单事件流：每条 order_events 响应里的 orders[]
    * 逐条 normalizeOrderEvent 展平（一个 snapshot 可能携带多条事件）。
    * status 归一化取值与映射依据见 NormalizedOrderStatus 注释。
    */
@@ -1075,7 +1074,7 @@ export class RealWsJsonClient implements WsJsonClient {
     return this.dispatchOneShot(GetWatchlistMessageHandler, watchlistId);
   }
 
-  // ---- 账户域（docs/TECHNICAL.md，probe-2026-10-13 实测背书）----
+  // ---- 账户域（TECHNICAL.md 实测背书）----
   // Promise 型门面统一取首个 snapshot；error 帧经 dispatch 自动 reject。
 
   getAccounts(): Promise<ParsedPayloadResponse> {
@@ -1115,13 +1114,13 @@ export class RealWsJsonClient implements WsJsonClient {
     ).iterable();
   }
 
-  // ---- 交易域（write-2026-10-13 W 组实测）----
+  // ---- 交易域（scripts/probe-write.mjs W 组实测）----
 
   confirmOrder(
     draft: PlaceLimitOrderRequestParams,
   ): Promise<ParsedPayloadResponse> {
     // W1：CONFIRM ver=1，id=update-draft-order-<SYMBOL>，返回草稿 snapshot。
-    // task-16：reclaimStore:false——这份 ver:1 snapshot 是后续 SUBMIT
+    // reclaimStore:false——这份 ver:1 snapshot 是后续 SUBMIT
     // ver:0 patch 的合并基底（同一逻辑文档），confirm settle 时就删会让
     // SUBMIT 失去基底；基底由 submitOrder 的 one-shot settle 统一回收
     // （只 CONFIRM 不 SUBMIT 时滞留至 disconnect/endBuffer 全量兜底）。
@@ -1139,7 +1138,7 @@ export class RealWsJsonClient implements WsJsonClient {
     // header.id 由同一个 symbol 推导，天然一致）。换 id 报
     // "Can not submit while prices are not available!"。
     //
-    // task-16 起走统一解析管道（原始帧拦截双轨已删除）：完成帧是 ver:0
+    // 现走统一解析管道（原始帧拦截双轨已删除）：完成帧是 ver:0
     // 的 patch，GenericIncomingMessageHandler 按 service+id 跨 ver 命中
     // ver:1 草稿基底，合并后 body.orders[0].orderId 即新订单号。完成帧
     // 之前可能先到 ver:1 的价格 patch（服务端异步注入），isFinal 用
@@ -1172,7 +1171,7 @@ export class RealWsJsonClient implements WsJsonClient {
   }
 
   /**
-   * 交易闸门统一入口（task-14D）：命中 GuardError 时返回 **已 reject 的
+   * 交易闸门统一入口：命中 GuardError 时返回 **已 reject 的
    * Promise**（而非同步抛出）——写操作返回 Promise 的门面方法以 rejection
    * 报告失败，await 调用方拿到的语义一致，也不会让闸门命中绕过
    * `.catch`/`.then(_, onReject)` 风格调用点。未配置 guard 或校验通过
@@ -1191,7 +1190,7 @@ export class RealWsJsonClient implements WsJsonClient {
     }
   }
 
-  // ---- 自选列表（write-2026-10-13 W5 系列实测）----
+  // ---- 自选列表（scripts/probe-write.mjs W5 系列实测）----
 
   getWatchlists(
     request: WatchlistCategoriesRequestParams,
@@ -1251,7 +1250,7 @@ export class RealWsJsonClient implements WsJsonClient {
     return this.dispatchOneShot(UserPropertiesMessageHandler, null as never);
   }
 
-  // ---- 第四批门面（docs/TECHNICAL.md §第四批接入契约）----
+  // ---- 扩展服务门面----
   // Promise 型走 dispatchOneShot（断线 reject 不重放）；推送流走 dispatchHandler
   // （注册进 activeRequests，重连后原样重放）。
 
@@ -1448,9 +1447,9 @@ export class RealWsJsonClient implements WsJsonClient {
     return this.dispatchHandler(MarketDepthMessageHandler, symbol).iterable();
   }
 
-  // ---- 第五批门面（docs/TECHNICAL.md §第五批接入契约，task-13）----
+  // ---- 补充服务门面----
   // Promise 型走 dispatchOneShot；持续推送流走 dispatchHandler（重放语义
-  // 同第四批）。options_statistics 为 snapshot+patch 流（线上实测），
+  // 同扩展服务）。options_statistics 为 snapshot+patch 流（线上实测），
   // 按契约以 AsyncIterable 消费。
 
   /** news_headers/get：新闻标题（单次 snapshot，实测参数 [symbol, limit]） */
@@ -1503,7 +1502,7 @@ export class RealWsJsonClient implements WsJsonClient {
 
   /**
    * chat_global/messages：交易台 chat 全局公告/服务时间。
-   * 契约（docs/TECHNICAL.md 第五批）定为 AsyncIterable：首帧 snapshot，公告/开关
+   * 契约（TECHNICAL.md）定为 AsyncIterable：首帧 snapshot，公告/开关
    * 变更由服务端推送更新（probe 观察窗内仅一帧 snapshot）。
    */
   subscribeGlobalChats(): AsyncIterable<ParsedPayloadResponse> {
@@ -1557,7 +1556,7 @@ export class RealWsJsonClient implements WsJsonClient {
       this.activeRequests.set(`${requestService}$${requestId}`, request);
     }
     const observable = this.responseObservable(requestService, requestId);
-    // P4（docs/TECHNICAL.md）：流式订阅的资源回收挂到消费者提前退出路径上——
+    // 流式订阅的资源回收挂到消费者提前退出路径上——
     // SubscriptionStream 的 return()/throw()（for-await 的 break / 抛异常）
     // 经 releaseSubscription 清 dataStore 基底、注销重放登记并 best-effort
     // 发 unsubscribe。服务端正常终止（buffer.end）不走这里，由 endBuffer
@@ -1572,7 +1571,7 @@ export class RealWsJsonClient implements WsJsonClient {
    * reject（TransportError），重连后 **不** 重放——重发写操作的后果由调用
    * 方承担是不可接受的，重试是调用方的责任。
    *
-   * task-16 扩展（SUBMIT 走统一管道所需，其余调用方行为不变）：
+   * 扩展（SUBMIT 走统一管道所需，其余调用方行为不变）：
    * - `reclaimStore: false`：settle 时不回收 dataStore 基底。place_order 的
    *   CONFIRM snapshot（ver:1）是后续 SUBMIT patch（ver:0 同 id）的合并基底，
    *   confirmOrder 的 one-shot 先于 SUBMIT 完成帧 settle，默认回收会让 patch
@@ -1610,7 +1609,7 @@ export class RealWsJsonClient implements WsJsonClient {
         ? observable.filter(options.isFinal).promise()
         : observable.promise();
       const reclaim = (): void => {
-        // P4：一次性请求到达终态，store 条目（若有 patch 基底）resolve 后
+        // 一次性请求到达终态，store 条目（若有 patch 基底）resolve 后
         // 立即回收；one-shot 不入 activeRequests，无需发 unsubscribe
         // （服务端一次性订阅自终止）。reclaimStore:false 时由后续步骤
         // （SUBMIT one-shot）或全量路径回收。
@@ -1656,7 +1655,7 @@ export class RealWsJsonClient implements WsJsonClient {
   }
 
   /**
-   * 流式订阅的资源回收（P4，docs/TECHNICAL.md）：消费者提前退出（for-await 的
+   * 流式订阅的资源回收：消费者提前退出（for-await 的
    * break/throw 触发 SubscriptionStream.return()/throw()）时调用。
    * 1) 删 GenericIncomingMessageHandler.dataStore 里该订阅的补丁基底
    *    （否则长连接下 quotes/chart 等高频 patch 的基底永久驻留，内存只涨不降）；
@@ -1774,15 +1773,15 @@ export class RealWsJsonClient implements WsJsonClient {
     // 显式断开后不再重连，旧订阅的消费者已随 buffer.end() 退出；
     // 清空登记表，避免 reconnect() 向新会话重放无人认领的请求。
     this.activeRequests.clear();
-    // P4：显式断开 = 服务端整个会话销毁，逐个发 unsubscribe 无意义；
-    // 直接清空本地 dataStore 的全部补丁基底（docs/TECHNICAL.md 内存增长项）。
+    // 显式断开 = 服务端整个会话销毁，逐个发 unsubscribe 无意义；
+    // 直接清空本地 dataStore 的全部补丁基底（TECHNICAL.md 内存增长项）。
     this.responseParser.clearStores();
     const socket = this.socket;
     this.socket = undefined;
     this.state = ChannelState.DISCONNECTED;
     // 先摘 socket 再 close：close 事件被身份守卫忽略，收尾在此统一做
     socket?.close();
-    // 等待响应的一次性请求不应悬挂（task-16：SUBMIT 完成帧走通用一次性
+    // 等待响应的一次性请求不应悬挂（SUBMIT 完成帧走通用一次性
     // 管道，旧 pendingSubmissions 专用排空已随之删除）——显式断开同样 reject。
     this.drainOneShots("explicit disconnect");
     this.failReconnectPromise(

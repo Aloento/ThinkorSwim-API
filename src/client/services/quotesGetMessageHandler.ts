@@ -4,10 +4,10 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 枚举抄自 本地录制 错误帧：
+// 枚举抄自本地录制错误帧：
 // "Possible enum values are [ASK, ASK_EXCHANGE, ASK_SIZE, BID,
 // BID_EXCHANGE, BID_SIZE, LAST, LAST_ETH, LAST_RTH, LAST_EXCHANGE,
-// LAST_SIZE, VOLUME]"——一次性报价可用字段（无流式 MARK 等，06 第三轮）。
+// LAST_SIZE, VOLUME]"——一次性报价可用字段（无流式 MARK 等）。
 const QUOTES_GET_FIELDS = [
   "ASK",
   "ASK_EXCHANGE",

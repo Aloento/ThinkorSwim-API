@@ -51,6 +51,6 @@ export function findByTypeOrThrow<TElements, TFilter extends TElements>(
   );
 }
 
-// P6（docs/TECHNICAL.md）：原实现 Math.random()*1e9 可碰撞。随机 UUID 在 Node ≥19 与
+// P6：原实现 Math.random()*1e9 可碰撞。随机 UUID 在 Node ≥19 与
 // 浏览器（window.crypto）都可用，作为请求 id 足够唯一。
 export const newRandomId = () => crypto.randomUUID();

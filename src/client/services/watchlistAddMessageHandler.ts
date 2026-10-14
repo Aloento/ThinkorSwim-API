@@ -5,7 +5,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 实测自 本地录制 第 1/2 帧：
+// 实测自本地录制第 1/2 帧：
 // 可用参数集合为 [watchlistId, symbols]（"params.symbol" 单数报 error）。
 export type WatchlistModifyRequestParams = {
   watchlistId: number;

@@ -15,7 +15,7 @@ const entryOf = (
   request: ReturnType<PlaceOrderMessageHandler["buildRequest"]>,
 ) => request.payload[0].params!.orders[0] as Record<string, unknown>;
 
-describe("order type extension (task-10)", () => {
+describe("order type extension", () => {
   describe("compile cases——判别联合按 orderType 约束价格字段", () => {
     it("LIMIT（默认）：limitPrice 必填、无 stopPrice", () => {
       const limit: PlaceOrderRequestParams = { ...base, limitPrice: 1 };

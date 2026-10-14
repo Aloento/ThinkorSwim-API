@@ -18,7 +18,7 @@ export type OptionChainDetailsItem = {
     putDisplaySymbol: string;
   }[];
   spc: number;
-  // 实测仅 Weeklys 系列携带（probe-2026-10-13/option_chain_get.jsonl），如 "Weeklys"
+  // 实测仅 Weeklys 系列携带（线上实测），如 "Weeklys"
   optionClassName?: string;
   name: string;
   contract: string;
@@ -27,7 +27,7 @@ export type OptionChainDetailsItem = {
   settlementType: "AM" | "PM";
 };
 
-// 实测请求形状（probe-2026-10-13/option_chain_get.jsonl 成功帧 + Lead 核对清单）：
+// 实测请求形状（线上成功帧）：
 // {underlyingSymbol, filter: {strikeQuantity, seriesNames?}}
 export type OptionChainDetailsRequest = {
   symbol: string;

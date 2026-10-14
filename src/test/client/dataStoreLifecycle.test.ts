@@ -16,7 +16,7 @@ import {
 } from "../../client/tdaWsJsonTypes";
 
 /**
- * 任务11（P4，docs/TECHNICAL.md）：dataStore 生命周期清理 + iterable 提前退出联动。
+ * 任务11：dataStore 生命周期清理 + iterable 提前退出联动。
  * - handler 级：removeStore（按 service$id 前缀删全部 ver）/ clearStores /
  *   storeSize 测试钩子的直接单测；
  * - 客户端级：for-await break / 循环体异常触发 SubscriptionStream 的
@@ -142,7 +142,7 @@ describe("GenericIncomingMessageHandler dataStore lifecycle (P4)", () => {
   it("removeStore deletes the service+id entry and is idempotent", () => {
     const handler = new GenericIncomingMessageHandler();
     handler.parseResponse(snapshot("quotes", "generalQuotes", 0));
-    // task-16 不变量：同 service+id 至多一条基底——新 ver 的 snapshot 是同一
+    // 不变量：同 service+id 至多一条基底——新 ver 的 snapshot 是同一
     // 逻辑文档的新基底，旧条目被覆盖清理（旧实现此处会 ver:0/ver:1 并存）。
     handler.parseResponse(snapshot("quotes", "generalQuotes", 1));
     expect(handler.storeSize()).toBe(1);

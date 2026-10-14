@@ -10,7 +10,7 @@ import WebSocketApiMessageHandler, {
 //   news_body                        params:{newsCode}
 //                                    响应 {newsCode, text}
 // 均为 bundle 证据，线上帧未实测；get_relevant 对 guest 已报
-// "not permissioned"（news_headers_get_relevant.jsonl），subscribe_relevant
+// "not permissioned"（线上实测），subscribe_relevant
 // 预计同样 guest 权限受限。
 
 export type NewsHeadersSubscribeRelevantRequestParams = {

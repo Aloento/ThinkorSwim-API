@@ -18,7 +18,7 @@ export type WatchlistCategory = {
   watchlists: WatchlistSummaryItem[];
 };
 
-// 无自定义 watchlist 时 body 实测为空对象（W5.jsonl 第 2 帧），故 categories 可选。
+// 无自定义 watchlist 时 body 实测为空对象（线上实测），故 categories 可选。
 export type RawPayloadResponseWatchlistCategories = {
   categories?: WatchlistCategory[];
 };

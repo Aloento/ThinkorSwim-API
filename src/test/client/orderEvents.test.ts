@@ -20,7 +20,7 @@ import WorkingOrdersMessageHandler from "../../client/services/workingOrdersMess
 import { ParsedPayloadResponse } from "../../client/tdaWsJsonTypes";
 
 /**
- * task-14A/B/C：order_events 门面（原始流 + 归一化）、alerts/subscribe
+ * order_events 门面（原始流 + 归一化）、alerts/subscribe
  * iterable、workingOrders 查表派发。全 mock（jest-websocket-mock），无网络。
  */
 
@@ -286,7 +286,7 @@ const orderEventsFrame = (orders: RawOrderEvent[]) => ({
   ],
 });
 
-describe("RealWsJsonClient.orderEvents / observeOrders（task-14A）", () => {
+describe("RealWsJsonClient.orderEvents / observeOrders", () => {
   afterEach(async () => {
     await jest.advanceTimersByTimeAsync(50);
     jest.useRealTimers();
@@ -307,7 +307,7 @@ describe("RealWsJsonClient.orderEvents / observeOrders（task-14A）", () => {
           account: "IND-D100579QZ",
         }),
       );
-      // 与前端线上请求帧一致（watch2-console.txt +23.73s）
+      // 与前端线上请求帧一致
       expect(
         (
           server.messages[2] as {
@@ -387,7 +387,7 @@ describe("RealWsJsonClient.orderEvents / observeOrders（task-14A）", () => {
   });
 });
 
-describe("RealWsJsonClient.subscribeAlerts（task-14B）", () => {
+describe("RealWsJsonClient.subscribeAlerts", () => {
   afterEach(async () => {
     await jest.advanceTimersByTimeAsync(50);
     jest.useRealTimers();

@@ -9,7 +9,7 @@ import WebSocketApiMessageHandler, {
 //     params {"targetRequestId":"positions","targetService":"positions"}
 //   ← snapshot {"targetService":"support_chats","targetRequestId":"..."}
 //   ← error  "No subscription: positions$positions"（isTerminal，订阅已
-//     不存在时）——error 帧经 task-1 的 WebSocketApiError 通道 reject。
+//     不存在时）——error 帧经的 WebSocketApiError 通道 reject。
 export type UnsubscribeRequestParams = {
   // 原订阅请求的 service 与 id（服务端按 `service$id` 定位订阅）
   targetService: ApiService | string;

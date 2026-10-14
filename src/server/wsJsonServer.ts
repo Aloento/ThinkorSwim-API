@@ -31,7 +31,7 @@ export class WsJsonServer {
     private readonly wsJsonClientFactory: () => WsJsonClient,
     private readonly server: DefaultHttpsServer | DefaultHttpServer,
     private readonly port = DEFAULT_PORT,
-    /** S1（task-15）：透传给每个连接的 WsJsonServerProxy（如 authToken） */
+    /** 鉴权配置：透传给每个连接的 WsJsonServerProxy（如 authToken） */
     private readonly proxyOptions?: WsJsonServerProxyOptions,
   ) {
     this.wss = new WebSocketServer({ server: this.server });

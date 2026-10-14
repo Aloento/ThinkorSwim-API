@@ -44,7 +44,7 @@ export type ApiService =
   | "user_properties/set"
   | "disclosures/accept"
   | "transactions/categories"
-  // 第四批（task-8，docs/TECHNICAL.md §4 第二/三/五轮 + 前端 bundle 调用点核对）：
+  // 扩展服务：
   | "news_headers/get_relevant"
   | "news_headers/subscribe"
   | "news_headers/subscribe_relevant"

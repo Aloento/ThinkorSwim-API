@@ -39,7 +39,7 @@ export type RawAlertResponse = {
   expirationTime: number;
   lastTriggeredTime: number;
   status: AlertStatus;
-  // 实测两帧均含 tag: "TDA"（write-2026-10-13/W6.jsonl）
+  // 实测两帧均含 tag: "TDA"（线上实测）
   tag: string;
   market: {
     field: string;
