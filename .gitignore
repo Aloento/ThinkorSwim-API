@@ -83,6 +83,7 @@ typings/
 # blackbox test recordings & browser profile
 agent/artifacts/
 puppeteer-data/
+puppeteer-data-real/
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
