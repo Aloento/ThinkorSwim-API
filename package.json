@@ -2,6 +2,18 @@
   "name": "tos-wsjson-client",
   "version": "0.13.0",
   "description": "WebSocket client for the Thinkorswim wsjson websocket API",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Aloento/ThinkorSwim-API.git"
+  },
+  "keywords": [
+    "thinkorswim",
+    "schwab",
+    "websocket",
+    "wsjson",
+    "trading"
+  ],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
