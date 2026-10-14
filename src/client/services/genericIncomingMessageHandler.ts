@@ -16,6 +16,32 @@ const logger = debug("genericIncomingMessageHandler");
 export default class GenericIncomingMessageHandler {
   private readonly dataStore: Record<string, StoredData> = {};
 
+  /**
+   * task-16：基底按 **service+id** 命中，与 ver 无关。
+   *
+   * 线上语义（06 §3，W1/W2 实测）：同一 service+id 是**同一逻辑文档的演进**，
+   * ver 只是文档版本号——place_order 草稿 snapshot 是 ver:1，而 SUBMIT 完成
+   * patch 是 **ver:0 同 id**。旧实现按 `service_id_ver` 查基底，跨 ver patch
+   * 找不到基底 → fast-json-patch 在 `{}` 上应用（remove 不存在的 path 会
+   * **抛错**，即使 validateOperation:false）→ 整条 patch 被丢弃，orderId 丢失。
+   *
+   * 不变量：每个 service+id 在 dataStore 中**至多一条**基底，键后缀 = 最后一次
+   * snapshot 的 ver（纯诊断用）；patch 合并写回基底键，不新增条目。基底键与
+   * removeStore 用同一前缀规则（`service_id_`），语义保持一致。
+   */
+  private docPrefix(service: string, id: string): string {
+    return `${service}_${id}_`;
+  }
+
+  /** 找到 service+id 的当前基底键（跨 ver）；无基底时 undefined。 */
+  private findBaseKey(service: string, id: string): string | undefined {
+    const prefix = this.docPrefix(service, id);
+    for (const key of Object.keys(this.dataStore)) {
+      if (key.startsWith(prefix)) return key;
+    }
+    return undefined;
+  }
+
   parseResponse({ payload }: RawPayloadResponse): ParsedPayloadResponse[] {
     // Defensive: a malformed frame may carry a missing/non-array payload.
     if (!Array.isArray(payload)) return [];
@@ -34,6 +60,10 @@ export default class GenericIncomingMessageHandler {
         const storeKey = `${service}_${id}_${ver}`;
         if (type === RESPONSE_TYPE.SNAPSHOT) {
           const body = (entry.body ?? {}) as StoredData;
+          // task-16：snapshot 是该逻辑文档的新基底——先清掉同 id 其他 ver 的
+          // 旧条目，避免同文档出现多基底各自漂移（旧 ver 条目残留会让后续
+          // patch 命中哪条取决于遍历顺序）。
+          this.removeStore(service, id);
           this.dataStore[storeKey] = body;
           parsed.push({ service, id, body: entry.body ?? {} });
         } else if (type === RESPONSE_TYPE.PATCH) {
@@ -111,16 +141,19 @@ export default class GenericIncomingMessageHandler {
       );
       return [];
     }
-    const existingObject = this.dataStore[storeKey];
+    // task-16：跨 ver 命中基底（见 docPrefix 注释）。合并结果写回**基底键**
+    // （而非 patch 自身的 ver 键），维持「每文档一条基底」不变量。
+    const baseKey = this.findBaseKey(service, id) ?? storeKey;
+    const existingObject = this.dataStore[baseKey];
     if (!existingObject) {
       // Patch received before (or without) its snapshot base: warn loudly with
       // diagnostics instead of silently corrupting state, then continue.
       console.warn(
-        `⚠️ Received patch for ${storeKey} without a snapshot base; ` +
+        `⚠️ Received patch for ${baseKey} without a snapshot base; ` +
           `applying ${patches.length} patch(es) to an empty document. ` +
           `The resulting body may be incomplete.`,
       );
-      logger("patch without base: key=%s patches=%O", storeKey, patches);
+      logger("patch without base: key=%s patches=%O", baseKey, patches);
     }
     try {
       const { newDocument } = applyPatch(
@@ -128,11 +161,11 @@ export default class GenericIncomingMessageHandler {
         patches,
         /* validateOperation */ false,
       );
-      this.dataStore[storeKey] = newDocument;
+      this.dataStore[baseKey] = newDocument;
       return [{ service, id, body: newDocument ?? {} }];
     } catch (e) {
       console.warn(
-        `⚠️ Failed to apply patch for ${storeKey}, skipping entry: `,
+        `⚠️ Failed to apply patch for ${baseKey}, skipping entry: `,
         e,
       );
       return [];

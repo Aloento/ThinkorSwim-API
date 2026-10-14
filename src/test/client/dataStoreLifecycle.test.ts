@@ -139,15 +139,18 @@ describe("GenericIncomingMessageHandler dataStore lifecycle (P4)", () => {
     ],
   });
 
-  it("removeStore deletes all ver entries of service+id and is idempotent", () => {
+  it("removeStore deletes the service+id entry and is idempotent", () => {
     const handler = new GenericIncomingMessageHandler();
     handler.parseResponse(snapshot("quotes", "generalQuotes", 0));
+    // task-16 不变量：同 service+id 至多一条基底——新 ver 的 snapshot 是同一
+    // 逻辑文档的新基底，旧条目被覆盖清理（旧实现此处会 ver:0/ver:1 并存）。
     handler.parseResponse(snapshot("quotes", "generalQuotes", 1));
+    expect(handler.storeSize()).toBe(1);
     handler.parseResponse(snapshot("quotes", "generalQuotesX", 0));
-    expect(handler.storeSize()).toBe(3);
+    expect(handler.storeSize()).toBe(2);
 
     // 前缀按 `service_id_` 精确匹配：generalQuotesX 不属于 generalQuotes
-    expect(handler.removeStore("quotes", "generalQuotes")).toBe(2);
+    expect(handler.removeStore("quotes", "generalQuotes")).toBe(1);
     expect(handler.storeSize()).toBe(1);
 
     // 幂等：再次删除返回 0，不抛错

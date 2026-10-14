@@ -198,18 +198,11 @@ import {
   ParsedPayloadResponse,
   RawPayloadRequest,
   RawPayloadResponse,
-  RESPONSE_TYPE,
   TransportError,
   WebSocketApiError,
   WsJsonRawMessage,
 } from "./tdaWsJsonTypes.js";
-import {
-  Constructor,
-  debugLog,
-  ensure,
-  findByTypeOrThrow,
-  throwError,
-} from "./util.js";
+import { Constructor, debugLog, ensure, findByTypeOrThrow } from "./util.js";
 import { WsJsonClient } from "./wsJsonClient.js";
 import Authenticator from "../auth/authenticator.js";
 import { GuardOptions, GuardOrderCheck, OrderGuard } from "./guard.js";
@@ -228,6 +221,18 @@ export enum ChannelState {
 }
 
 const logger = debug("realWsJsonClient");
+
+/**
+ * task-16：SUBMIT 完成帧（跨 ver patch 合并后）的 orderId 在
+ * `body.orders[0].orderId`；草稿期该字段是占位 0（W1/W2 实测），
+ * 因此「orderId > 0」即终态帧判据。
+ */
+function extractOrderId(msg: ParsedPayloadResponse): number | undefined {
+  const orders = (msg.body as { orders?: { orderId?: unknown }[] } | undefined)
+    ?.orders;
+  const raw = orders?.[0]?.orderId;
+  return typeof raw === "number" && raw > 0 ? raw : undefined;
+}
 
 const messageHandlers: WebSocketApiMessageHandler<never>[] = [
   new CancelAlertMessageHandler(),
@@ -422,18 +427,6 @@ export class RealWsJsonClient implements WsJsonClient {
   private pendingReplayAfterLogin = false;
   /** buffer.end() 是否已调用（重连需重建缓冲时据此判断） */
   private bufferEnded = false;
-  /**
-   * 等待 SUBMIT 完成帧（orderId patch / error 帧）的 waiter，key 为
-   * `<service>$<requestId>`。这些帧必须看原始 header（ver/type），不能走
-   * 已解析流（见 submitOrder 注释）。
-   */
-  private readonly pendingSubmissions = new Map<
-    string,
-    {
-      resolve: (value: ParsedPayloadResponse) => void;
-      reject: (reason: unknown) => void;
-    }
-  >();
 
   constructor(
     options: RealWsJsonClientOptions = {},
@@ -596,13 +589,9 @@ export class RealWsJsonClient implements WsJsonClient {
       new TransportError(`Connection lost before login completed: ${reason}`),
     );
     // 一次性（promise 型）等待者：断开即 reject，重发重试是调用方的事
+    // （task-16：SUBMIT 完成帧的等待者走通用一次性管道，drainOneShots 已覆盖，
+    // 旧的 pendingSubmissions 专用排空随原始帧拦截一起删除）
     this.drainOneShots(`Connection lost: ${reason}`);
-    // 等待 SUBMIT 完成帧的调用方不应悬挂——同样 reject（Error 化）。
-    this.drainPendingSubmissions(
-      new TransportError(
-        `Connection closed before order submission completed: ${reason}`,
-      ),
-    );
     const canRecover =
       !this.explicitDisconnect &&
       this.autoReconnect &&
@@ -643,12 +632,11 @@ export class RealWsJsonClient implements WsJsonClient {
       } else if (isSchwabLoginResponse(message)) {
         this.handleSchwabLoginResponse(message);
       } else {
-        // SUBMIT 完成帧（orderId patch / error 帧）由原始拦截消费；
-        // 其余（或 payload 里混有其他条目时）走通用解析。
-        if (!this.checkPendingSubmissions(message)) {
-          const parsedResponse = responseParser.parseResponse(message);
-          parsedResponse?.forEach((r) => buffer.emit(r));
-        }
+        // task-16：全部业务帧走通用解析管道（旧的 SUBMIT 完成帧原始拦截
+        // 已删除——storeKey 现在按 service+id 跨 ver 命中基底，ver:0 的
+        // orderId patch 能正常合并进 ver:1 草稿基底）。
+        const parsedResponse = responseParser.parseResponse(message);
+        parsedResponse?.forEach((r) => buffer.emit(r));
       }
     } catch (e) {
       console.warn("⚠️ Failed to process websocket frame, ignoring: ", e);
@@ -738,7 +726,6 @@ export class RealWsJsonClient implements WsJsonClient {
     }
     this.failReconnectPromise(err);
     this.drainOneShots(err.message);
-    this.drainPendingSubmissions(err);
     if (!this.bufferEnded) this.endBuffer();
   }
 
@@ -915,13 +902,6 @@ export class RealWsJsonClient implements WsJsonClient {
     this.pendingOneShots.clear();
     const err = new TransportError(`Connection lost: ${reason}`);
     for (const reject of waiters) reject(err);
-  }
-
-  private drainPendingSubmissions(err: Error) {
-    for (const [key, waiter] of this.pendingSubmissions) {
-      this.pendingSubmissions.delete(key);
-      waiter.reject(err);
-    }
   }
 
   private endBuffer() {
@@ -1141,9 +1121,15 @@ export class RealWsJsonClient implements WsJsonClient {
     draft: PlaceLimitOrderRequestParams,
   ): Promise<ParsedPayloadResponse> {
     // W1：CONFIRM ver=1，id=update-draft-order-<SYMBOL>，返回草稿 snapshot。
+    // task-16：reclaimStore:false——这份 ver:1 snapshot 是后续 SUBMIT
+    // ver:0 patch 的合并基底（同一逻辑文档），confirm settle 时就删会让
+    // SUBMIT 失去基底；基底由 submitOrder 的 one-shot settle 统一回收
+    // （只 CONFIRM 不 SUBMIT 时滞留至 disconnect/endBuffer 全量兜底）。
     const rejected = this.checkOrderGuard("confirmOrder", draft);
     if (rejected) return rejected;
-    return this.dispatchOneShot(PlaceOrderMessageHandler, draft);
+    return this.dispatchOneShot(PlaceOrderMessageHandler, draft, {
+      reclaimStore: false,
+    });
   }
 
   submitOrder(
@@ -1153,31 +1139,25 @@ export class RealWsJsonClient implements WsJsonClient {
     // header.id 由同一个 symbol 推导，天然一致）。换 id 报
     // "Can not submit while prices are not available!"。
     //
-    // orderId 只在 SUBMIT 后的 patch（path /orders/0/orderId）里，且该帧
-    // ver=0 而 CONFIRM snapshot 存于 ver=1 的 storeKey——当前
-    // GenericIncomingMessageHandler 对无 base 的 patch 会丢弃该条目。
-    // 因此这里在 onMessage 里直接拦截原始帧（见 checkPendingSubmissions），
-    // 不经过已解析流；error 帧同样在此 reject。
+    // task-16 起走统一解析管道（原始帧拦截双轨已删除）：完成帧是 ver:0
+    // 的 patch，GenericIncomingMessageHandler 按 service+id 跨 ver 命中
+    // ver:1 草稿基底，合并后 body.orders[0].orderId 即新订单号。完成帧
+    // 之前可能先到 ver:1 的价格 patch（服务端异步注入），isFinal 用
+    // orderId>0 区分终态帧与中间帧；error 帧经 responseObservable 直接
+    // reject（WebSocketApiError），无需在此处理。
     const rejected = this.checkOrderGuard("submitOrder", draft);
     if (rejected) return rejected;
-    this.ensureConnected();
-    const handler = findByTypeOrThrow(
-      messageHandlers,
-      SubmitOrderMessageHandler,
-    );
-    const request = handler.buildRequest(draft);
-    const { service: requestService, id: requestId } =
-      request.payload?.[0]?.header ?? {};
-    if (!requestService || !requestId) {
-      throwError("submitOrder: handler produced a request without service/id");
-    }
-    // 同一 symbol 的重复提交会覆盖旧 waiter——服务端草稿本来就是按 id 唯一的。
-    return new Promise<ParsedPayloadResponse>((resolve, reject) => {
-      this.pendingSubmissions.set(`${requestService}$${requestId}`, {
-        resolve,
-        reject,
-      });
-      this.sendMessage(request);
+    return this.dispatchOneShot(SubmitOrderMessageHandler, draft, {
+      isFinal: (msg) => extractOrderId(msg) !== undefined,
+    }).then((merged) => {
+      // 门面契约（README / smoke-order / mock 依赖）：body.orderId 顶层可见。
+      // 合并后的完整草稿文档一并保留（confirmation 块已被完成帧 remove）。
+      const orderId = extractOrderId(merged);
+      return {
+        service: merged.service,
+        id: merged.id,
+        body: { ...(merged.body ?? {}), orderId },
+      };
     });
   }
 
@@ -1591,10 +1571,25 @@ export class RealWsJsonClient implements WsJsonClient {
    * 一次性（promise 型）请求。与流式 dispatch 的关键区别：断开时等待者被
    * reject（TransportError），重连后 **不** 重放——重发写操作的后果由调用
    * 方承担是不可接受的，重试是调用方的责任。
+   *
+   * task-16 扩展（SUBMIT 走统一管道所需，其余调用方行为不变）：
+   * - `reclaimStore: false`：settle 时不回收 dataStore 基底。place_order 的
+   *   CONFIRM snapshot（ver:1）是后续 SUBMIT patch（ver:0 同 id）的合并基底，
+   *   confirmOrder 的 one-shot 先于 SUBMIT 完成帧 settle，默认回收会让 patch
+   *   失去基底——改由 SUBMIT one-shot settle 时统一回收（每草稿 id 至多一条
+   *   基底，泄漏面有界；disconnect/endBuffer 全量兜底）。
+   * - `isFinal`：从匹配条目中挑出终态响应，缺省仍是「首个匹配条目即终态」。
+   *   SUBMIT 的完成帧之前可能先收到草稿的价格 patch（ver:1，服务端异步注入），
+   *   这些中间条目被跳过（其 body 已合并进 store，无需透出）。error 条目在
+   *   responseObservable 层直接抛 WebSocketApiError，不受 isFinal 影响。
    */
   private dispatchOneShot<Req>(
     handlerCtor: Constructor<WebSocketApiMessageHandler<Req>>,
     args: Req,
+    options: {
+      reclaimStore?: boolean;
+      isFinal?: (msg: ParsedPayloadResponse) => boolean;
+    } = {},
   ): Promise<ParsedPayloadResponse> {
     const handler = findByTypeOrThrow(messageHandlers, handlerCtor);
     this.ensureConnected();
@@ -1610,27 +1605,31 @@ export class RealWsJsonClient implements WsJsonClient {
         this.pendingOneShots.set(key, (err) => reject(err));
       }
       this.sendMessage(request);
-      this.responseObservable(requestService, requestId)
-        .promise()
-        .then(
-          (value) => {
-            if (key) this.pendingOneShots.delete(key);
-            // P4：一次性请求的首个响应即终态，store 条目（若有 patch 基底）
-            // resolve 后立即回收；one-shot 不入 activeRequests，无需发
-            // unsubscribe（服务端一次性订阅自终止）。
-            if (requestService && requestId) {
-              this.responseParser.removeStore(requestService, requestId);
-            }
-            resolve(value);
-          },
-          (err) => {
-            if (key) this.pendingOneShots.delete(key);
-            if (requestService && requestId) {
-              this.responseParser.removeStore(requestService, requestId);
-            }
-            reject(err);
-          },
-        );
+      const observable = this.responseObservable(requestService, requestId);
+      const pending = options.isFinal
+        ? observable.filter(options.isFinal).promise()
+        : observable.promise();
+      const reclaim = (): void => {
+        // P4：一次性请求到达终态，store 条目（若有 patch 基底）resolve 后
+        // 立即回收；one-shot 不入 activeRequests，无需发 unsubscribe
+        // （服务端一次性订阅自终止）。reclaimStore:false 时由后续步骤
+        // （SUBMIT one-shot）或全量路径回收。
+        if (options.reclaimStore !== false && requestService && requestId) {
+          this.responseParser.removeStore(requestService, requestId);
+        }
+      };
+      pending.then(
+        (value) => {
+          if (key) this.pendingOneShots.delete(key);
+          reclaim();
+          resolve(value);
+        },
+        (err) => {
+          if (key) this.pendingOneShots.delete(key);
+          reclaim();
+          reject(err);
+        },
+      );
     });
   }
 
@@ -1685,67 +1684,6 @@ export class RealWsJsonClient implements WsJsonClient {
       // best-effort：unsubscribe 发送失败不影响本地回收已完成的事实
       debugLog("best-effort unsubscribe failed for %s$%s: %s", service, id, e);
     }
-  }
-
-  /**
-   * SUBMIT 完成帧的原始拦截（见 submitOrder）。返回 true 表示整个 payload
-   * 已被消费，不必再进通用解析（ver=0 的 patch 在通用解析里因缺少
-   * snapshot base 会被丢弃并打出误导性的告警）。
-   */
-  private checkPendingSubmissions(message: WsJsonRawMessage): boolean {
-    if (this.pendingSubmissions.size === 0) return false;
-    const payload = (message as RawPayloadResponse).payload;
-    if (!Array.isArray(payload) || payload.length === 0) return false;
-    let consumedAll = true;
-    for (const entry of payload) {
-      const header = entry?.header;
-      if (!header) return false;
-      const key = `${header.service}$${header.id}`;
-      const waiter = this.pendingSubmissions.get(key);
-      if (!waiter || header.ver !== 0) {
-        // 其他订阅者的条目（如 CONFIRM 的 ver=1 帧）走通用解析。
-        consumedAll = false;
-        continue;
-      }
-      if (header.type === RESPONSE_TYPE.ERROR) {
-        this.pendingSubmissions.delete(key);
-        const body = (entry.body ?? {}) as {
-          message?: string;
-          isTerminal?: boolean;
-        };
-        waiter.reject(
-          new WebSocketApiError(
-            body.message ?? `Order submission (id=${header.id}) failed`,
-            {
-              service: header.service,
-              requestId: header.id,
-              isTerminal: body.isTerminal,
-            },
-          ),
-        );
-      } else if (header.type === RESPONSE_TYPE.PATCH) {
-        const patches = (
-          entry.body as
-            | { patches?: { op: string; path: string; value?: unknown }[] }
-            | undefined
-        )?.patches;
-        const orderIdOp = patches?.find((op) => op.path.endsWith("/orderId"));
-        if (orderIdOp && "value" in orderIdOp) {
-          // W2 实测：orderId 经 patch /orders/0/orderId 返回。
-          this.pendingSubmissions.delete(key);
-          waiter.resolve({
-            service: header.service,
-            id: header.id,
-            body: { orderId: orderIdOp.value },
-          });
-        } else {
-          consumedAll = false;
-        }
-      } else {
-        consumedAll = false;
-      }
-    }
-    return consumedAll;
   }
 
   private sendMessage(data: any) {
@@ -1816,7 +1754,6 @@ export class RealWsJsonClient implements WsJsonClient {
     }
     this.failReconnectPromise(err);
     this.drainOneShots(err.message);
-    this.drainPendingSubmissions(err);
     if (!this.bufferEnded) this.endBuffer();
   }
 
@@ -1845,12 +1782,9 @@ export class RealWsJsonClient implements WsJsonClient {
     this.state = ChannelState.DISCONNECTED;
     // 先摘 socket 再 close：close 事件被身份守卫忽略，收尾在此统一做
     socket?.close();
-    // 等待 SUBMIT 完成帧的调用方不应悬挂——连接断开时全部 reject。
-    this.drainPendingSubmissions(
-      new TransportError(
-        "Connection closed before order submission completed.",
-      ),
-    );
+    // 等待响应的一次性请求不应悬挂（task-16：SUBMIT 完成帧走通用一次性
+    // 管道，旧 pendingSubmissions 专用排空已随之删除）——显式断开同样 reject。
+    this.drainOneShots("explicit disconnect");
     this.failReconnectPromise(
       new TransportError("Disconnected while reconnecting"),
     );
