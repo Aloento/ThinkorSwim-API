@@ -87,8 +87,10 @@ node --env-file=.env dist/example/wsProxyServer.js
 
 # 已知限制
 
-- 部分服务（news/relevant、screener、study/subscribe、tax_lot 深查、fundamentals/history）
+- 部分服务（news/relevant、screener、study/subscribe、tax_lot 深查）
   对 guest 账号权限受限，已在真实账户范围外标注；库 API 仍提供，成功帧待真实账户确认。
+  （fundamentals/history 已修通：无 `time` 参数，`fields` 仅收 21 个 historical 字段，
+  guest 实测 snapshot 通过。）
 - token 自动续期：`Authenticator`（src/auth/authenticator.ts）已落地——23h 阈值内经
   `access_token/get` 自动换 token，`onTokenRotated` 回调必须持久化轮换后的新
   refreshToken（一次性）。guest 无 refreshToken（直通并 warn 一次），端到端续期

@@ -48,6 +48,7 @@
 4. **库实现覆盖**：`ApiService` 77 个服务名、50+ handler、四批门面接入；下单两步
    （CONFIRM/SUBMIT 同草稿 id）、真实线帧回放测试、连接生命周期（重连退避/心跳
    看门狗/订阅重放）全部落地并在真实服务器上冒烟通过。
-5. **剩余**：news_relevant/study_subscribe/scan_query/fundamentals_history 等对 guest
-   权限受限（真实账户回归）；token 自动续期（Authenticator）待真实 refreshToken 联调。
+5. **剩余**：news_relevant/study_subscribe/scan_query 等对 guest 权限受限（真实账户
+   回归）；fundamentals_history 第七轮已修通（无 time 参数）；token 自动续期
+   （Authenticator）已落地，端到端续期待真实 refreshToken 联调。
 6. 重构按 05 的六个阶段推进（阶段 0/2 完成，阶段 1 除续期外完成）；实测细节以 06 为准，集成以 07 为准。
