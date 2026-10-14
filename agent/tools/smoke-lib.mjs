@@ -234,6 +234,31 @@ console.log(
     : `service=${al.value?.service}`,
 );
 
+// 第八批（task-17）：study/subscribe 修通断言——studies 元素必填
+// aggregationPeriod，实测 snapshot {values:{SYMBOL:{studyName:num}}}。
+const studyFrame = await firstFrame(
+  client.subscribeStudies({
+    symbols: ["AAPL"],
+    type: "PUBLIC",
+    studies: [
+      { name: "SimpleMovingAvg", aggregationPeriod: "DAY", parameters: {} },
+    ],
+  }),
+  8000,
+);
+const studyValues =
+  studyFrame !== "timeout" ? studyFrame.value?.body?.values : undefined;
+console.log(
+  "[smoke] study/subscribe:",
+  studyValues
+    ? `AAPL SimpleMovingAvg=${studyValues.AAPL?.SimpleMovingAvg}`
+    : "no snapshot (timeout)",
+);
+if (!studyValues?.AAPL?.SimpleMovingAvg) {
+  console.error("[smoke] FAIL: study/subscribe returned no study value");
+  process.exit(1);
+}
+
 client.disconnect();
 console.log(
   "[smoke] DONE — all facade methods round-tripped against live paper server",
