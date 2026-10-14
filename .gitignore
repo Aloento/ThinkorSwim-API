@@ -81,7 +81,9 @@ typings/
 !.env.*.example
 
 # blackbox test recordings & browser profile
-agent/artifacts/
+scripts/artifacts/
+scripts/puppeteer-data/
+scripts/puppeteer-data-real/
 puppeteer-data/
 puppeteer-data-real/
 

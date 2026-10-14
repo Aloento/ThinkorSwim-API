@@ -8,8 +8,9 @@ export default tseslint.config(
     ignores: [
       "dist/**",
       "node_modules/**",
-      "agent/artifacts/**",
-      "puppeteer-data/**",
+      "scripts/artifacts/**",
+      "scripts/puppeteer-data/**",
+      "scripts/puppeteer-data-real/**",
       "*.config.js",
       "*.config.cjs",
       "eslint.config.mjs",
