@@ -166,6 +166,22 @@ if (!fundamentals.body.values) {
   process.exit(1);
 }
 
+// fundamentals/history：无 time 参数；只收 21 个 historical 字段
+// （agent/artifacts/fund-hist-findings.md，guest 实测 snapshot）
+const hist = await client.getFundamentalsHistory({
+  symbol: "AAPL",
+  fields: ["EARNINGS_PER_SHARE_TTM"],
+});
+const histSeries = hist.body.quarterlyValues?.EARNINGS_PER_SHARE_TTM;
+console.log(
+  "[smoke] fundamentals/history: series points=",
+  histSeries ? Object.keys(histSeries).length : 0,
+);
+if (!histSeries || Object.keys(histSeries).length === 0) {
+  console.error("[smoke] FAIL: fundamentals/history returned no series");
+  process.exit(1);
+}
+
 // order_history：epoch 秒，窗口 ≤370 天（用近 90 天；paper 账户实测 code）
 const nowSec = Math.floor(Date.now() / 1000);
 const history = await client.getOrderHistory({
