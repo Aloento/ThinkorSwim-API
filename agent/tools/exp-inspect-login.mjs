@@ -1,7 +1,6 @@
 // 检查真实账户登录响应实形，token 类值脱敏，只看结构/键/refreshToken 去向
 import { readFileSync } from "node:fs";
 const j = JSON.parse(readFileSync("agent/artifacts/login-real.json", "utf8"));
-const SENSITIVE = /token|code|secret|password|eat|newT|session|user|account/i;
 const isSecretVal = (k, v) =>
   /token|refreshtoken|authcode|eat$|newt$/i.test(k) &&
   typeof v === "string" &&

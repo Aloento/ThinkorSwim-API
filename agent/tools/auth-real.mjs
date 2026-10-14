@@ -54,7 +54,6 @@ async function main() {
     await page.setViewport({ width: 1100, height: 860 });
 
     let tsm = null;
-    let wslogin = null; // 页面自己的 wsjson login/schwab 响应帧
     page.on("response", async (res) => {
       const u = res.url();
       try {
