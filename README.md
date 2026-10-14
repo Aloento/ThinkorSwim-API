@@ -72,7 +72,8 @@ node --env-file=.env dist/example/wsProxyServer.js
 | 其他     | unsubscribe（订阅清理）· 客服聊天（chat/create·close·send_message · support_chat/messages · chat_global/messages）· demo_account(⚠️) · logoff(⚠️)                                                                                                    |
 
 > **连接层内置**（默认开启）：断线指数退避自动重连（0.5s→30s+jitter）、心跳看门狗（10s）、
-> 握手/登录超时（15s）、重连后活跃流式订阅原样重放；错误全部为 Error 子类
+> 握手/登录超时（15s）、重连后活跃流式订阅原样重放；for-await 提前 break/抛异常自动回收
+> 补丁基底并向服务端发 `unsubscribe`（`autoUnsubscribe` 可关）；错误全部为 Error 子类
 > （`WebSocketApiError`/`AuthError`/`TransportError`）。
 >
 > 注：`news_headers/get`、`fundamentals/current`、`studies/get`、`options_statistics`、
