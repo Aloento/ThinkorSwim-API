@@ -333,7 +333,7 @@ L4 真实账户冒烟  真实账户   只读白名单（32 项）              �
 | `auth-real.mjs`        | L1  | 真实账户登录（默认无头，F2A 自动选渠道+信任设备，收割 token/refreshToken）    |
 | `probe-login.mjs`      | L1  | 裸协议：新鲜 authCode 走 login/schwab，dump 脱敏响应                          |
 | `probe-services.mjs`   | L2  | 只读服务普查 30+ 项，原始帧录制：`node scripts/probe-services.mjs [service…]` |
-| `probe-write.mjs`      | L3  | 写用例 W 组（paper 硬闸门）：`node scripts/probe-write.mjs W1                 | W2  | …`  |
+| `probe-write.mjs`      | L3  | 写用例 W 组（paper 硬闸门）：`node scripts/probe-write.mjs W1 \| W2 \| …`     |
 | `smoke-lib.mjs`        | L3  | 编译库 API 端到端冒烟（22 断言，含 watchlist 写闭环与流式可达）               |
 | `smoke-order.mjs`      | L3  | 下单冒烟：$1 限价 1 股 + 自动撤单（paper；账户运行时从 accounts 现取）        |
 | `smoke-real.mjs`       | L4  | 真实账户 32 项只读核对（判定矩阵见 §9.9）                                     |
