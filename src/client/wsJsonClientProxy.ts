@@ -28,6 +28,7 @@ export const ALL_REQUESTS = [
   "authenticateWithAccessToken",
   "optionChainQuotes",
   "disconnect",
+  "reconnect",
   "quotes",
   "accountPositions",
   "getPositions",
@@ -189,6 +190,11 @@ export class WsJsonClientProxy implements WsJsonClient {
 
   disconnect(): void {
     this.sendMessage({ request: "disconnect" });
+  }
+
+  /** 透传到上游真实客户端的重连（握手→登录→订阅重放完成后 resolve） */
+  reconnect(): Promise<void> {
+    return this.dispatch<void>("reconnect").promise();
   }
 
   ensureConnected(): void {

@@ -75,6 +75,7 @@ export default class WsJsonServerProxy implements Disposable {
       case "createWatchlist":
       case "renameWatchlist":
       case "deleteWatchlist":
+      case "reconnect":
         return await this.relayPromise(msg);
       case "disconnect":
         return this.upstream!.disconnect();

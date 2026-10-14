@@ -70,6 +70,11 @@ export default class MockWsJsonClient implements WsJsonClient {
 
   disconnect(): void {}
 
+  reconnect(): Promise<void> {
+    // Mock 连接无真实 socket：空实现
+    return Promise.resolve();
+  }
+
   ensureConnected(): void {}
 
   isConnected(): boolean {

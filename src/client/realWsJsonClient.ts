@@ -73,9 +73,12 @@ import WatchlistRenameMessageHandler, {
 import WebSocketApiMessageHandler from "./services/webSocketApiMessageHandler.js";
 import WorkingOrdersMessageHandler from "./services/workingOrdersMessageHandler.js";
 import {
+  AuthError,
   ParsedPayloadResponse,
+  RawPayloadRequest,
   RawPayloadResponse,
   RESPONSE_TYPE,
+  TransportError,
   WebSocketApiError,
   WsJsonRawMessage,
 } from "./tdaWsJsonTypes.js";
@@ -149,6 +152,23 @@ export type RealWsJsonClientOptions = {
   /** 可选 Cookie 头（部分场景需要携带登录会话 cookie） */
   cookie?: string;
   userAgent?: string;
+  /**
+   * WebSocket 工厂。重连必须使用全新连接（socket 不可复用），因此重连走
+   * 工厂而非构造时注入的 socket。默认 `(url, headers) => new WebSocket(url, { headers })`。
+   */
+  socketFactory?: (url: string, headers: Record<string, string>) => WebSocket;
+  /** 握手（connect + login 完成）超时，默认 15s；超时后 reject 并触发重连 */
+  handshakeTimeoutMs?: number;
+  /** 心跳看门狗：连续 N ms 未收到 {heartbeat} 帧判定死链主动 close（实测线上约 2s 一次）。默认 10_000，0 关闭 */
+  heartbeatTimeoutMs?: number;
+  /** 重连退避初始延迟，默认 500ms */
+  reconnectBackoffInitialMs?: number;
+  /** 重连退避上限，默认 30s */
+  reconnectBackoffMaxMs?: number;
+  /** 退避抖动比例 0~1（默认 0.2）；设 0 得到确定性延迟（便于测试） */
+  reconnectJitterRatio?: number;
+  /** 意外断开（含心跳判死）后是否自动重连，默认 true（仅限曾成功认证过的会话） */
+  autoReconnect?: boolean;
 };
 
 export class RealWsJsonClient implements WsJsonClient {
@@ -161,6 +181,47 @@ export class RealWsJsonClient implements WsJsonClient {
     accessToken?: string;
     refreshToken?: string;
   } = {};
+  private readonly options: RealWsJsonClientOptions;
+  private readonly handshakeTimeoutMs: number;
+  private readonly heartbeatTimeoutMs: number;
+  private readonly reconnectBackoffInitialMs: number;
+  private readonly reconnectBackoffMaxMs: number;
+  private readonly reconnectJitterRatio: number;
+  private readonly autoReconnect: boolean;
+  /** 构造时注入的 socket（测试注入用）；仅首次连接消费，重连一律走工厂 */
+  private injectedSocket?: WebSocket;
+  private socket?: WebSocket;
+  /** 当前握手尝试的 settle 回调（login 响应到达 / 断开 / 超时时结算） */
+  private pendingHandshake?: {
+    resolve: (value: RawLoginResponseBody) => void;
+    reject: (err: Error) => void;
+  };
+  /** 手动 reconnect() 的等待者；下次成功 login 时 resolve，显式 disconnect 时 reject */
+  private reconnectPromise?: Promise<void>;
+  private resolveReconnect?: () => void;
+  private rejectReconnect?: (err: Error) => void;
+  private handshakeTimer?: ReturnType<typeof setTimeout>;
+  private heartbeatTimer?: ReturnType<typeof setTimeout>;
+  private reconnectTimer?: ReturnType<typeof setTimeout>;
+  private reconnectAttempts = 0;
+  /** 是否曾经成功登录过——自动重连只对"活过的会话"生效，凭据错误不无限重试 */
+  private hasAuthenticated = false;
+  /** 用户显式 disconnect() 后置 true：close 不再触发自动重连 */
+  private explicitDisconnect = false;
+  /**
+   * 流式订阅的原始请求（key = `service$id`，插入序）。重连成功并重新 login
+   * 后按序重发（服务端按 id 幂等重建订阅）。一次性请求不入此表。
+   */
+  private readonly activeRequests = new Map<string, RawPayloadRequest>();
+  /**
+   * 一次性（promise 型）dispatch 的等待者（key → reject）。连接断开时统一
+   * reject（语义：失败重试交调用方）；正常完成后自行注销。
+   */
+  private readonly pendingOneShots = new Map<string, (err: Error) => void>();
+  /** 本轮 login 成功后是否需要重放订阅并结算 reconnect() promise */
+  private pendingReplayAfterLogin = false;
+  /** buffer.end() 是否已调用（重连需重建缓冲时据此判断） */
+  private bufferEnded = false;
   /**
    * 等待 SUBMIT 完成帧（orderId patch / error 帧）的 waiter，key 为
    * `<service>$<requestId>`。这些帧必须看原始 header（ver/type），不能走
@@ -176,24 +237,54 @@ export class RealWsJsonClient implements WsJsonClient {
 
   constructor(
     options: RealWsJsonClientOptions = {},
-    private readonly socket = new WebSocket(options.wsUrl ?? DEFAULT_WS_URL, {
-      headers: {
-        Pragma: "no-cache",
-        Origin: "https://trade.thinkorswim.com",
-        Upgrade: "websocket",
-        "Cache-Control": "no-cache",
-        Connection: "Upgrade",
-        "Sec-WebSocket-Version": "13",
-        "Sec-WebSocket-Extensions":
-          "permessage-deflate; client_max_window_bits",
-        ...(options.cookie ? { Cookie: options.cookie } : {}),
-        "User-Agent":
-          options.userAgent ??
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
-      },
-    }),
+    socket?: WebSocket,
     private readonly responseParser = new ResponseParser(this.genericHandler),
-  ) {}
+  ) {
+    this.options = options;
+    this.injectedSocket = socket;
+    this.handshakeTimeoutMs = options.handshakeTimeoutMs ?? 15_000;
+    this.heartbeatTimeoutMs = options.heartbeatTimeoutMs ?? 10_000;
+    this.reconnectBackoffInitialMs = options.reconnectBackoffInitialMs ?? 500;
+    this.reconnectBackoffMaxMs = options.reconnectBackoffMaxMs ?? 30_000;
+    this.reconnectJitterRatio = Math.min(
+      1,
+      Math.max(0, options.reconnectJitterRatio ?? 0.2),
+    );
+    this.autoReconnect = options.autoReconnect ?? true;
+  }
+
+  private static buildHeaders(
+    options: RealWsJsonClientOptions,
+  ): Record<string, string> {
+    return {
+      Pragma: "no-cache",
+      Origin: "https://trade.thinkorswim.com",
+      Upgrade: "websocket",
+      "Cache-Control": "no-cache",
+      Connection: "Upgrade",
+      "Sec-WebSocket-Version": "13",
+      "Sec-WebSocket-Extensions": "permessage-deflate; client_max_window_bits",
+      ...(options.cookie ? { Cookie: options.cookie } : {}),
+      "User-Agent":
+        options.userAgent ??
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
+    };
+  }
+
+  /** 首次连接优先用注入的 socket；之后（重连）一律走工厂/默认实现 */
+  private createSocket(): WebSocket {
+    if (this.injectedSocket) {
+      const socket = this.injectedSocket;
+      this.injectedSocket = undefined;
+      return socket;
+    }
+    const url = this.options.wsUrl ?? DEFAULT_WS_URL;
+    const headers = RealWsJsonClient.buildHeaders(this.options);
+    if (this.options.socketFactory) {
+      return this.options.socketFactory(url, headers);
+    }
+    return new WebSocket(url, { headers });
+  }
 
   get accessToken() {
     return this.credentials.accessToken;
@@ -224,40 +315,103 @@ export class RealWsJsonClient implements WsJsonClient {
   }
 
   private async handshake(): Promise<RawLoginResponseBody | null> {
-    const { state } = this;
-    switch (state) {
+    switch (this.state) {
       case ChannelState.DISCONNECTED:
-        this.buffer = new BufferedIterator<ParsedPayloadResponse>();
-        this.iterator = new MulticastIterator(this.buffer);
+        if (this.bufferEnded) {
+          // 上一轮显式 disconnect 已把旧缓冲置为终态，重建供本轮使用
+          this.buffer = new BufferedIterator<ParsedPayloadResponse>();
+          this.iterator = new MulticastIterator(this.buffer);
+          this.bufferEnded = false;
+        }
+        this.explicitDisconnect = false;
         this.state = ChannelState.CONNECTING;
         return await this.doConnect();
       case ChannelState.CONNECTING: // no-op
-        return Promise.reject("Already connecting");
+        return Promise.reject(new TransportError("Already connecting"));
       case ChannelState.CONNECTED: // no-op
-        return Promise.reject("Already connected");
+        return Promise.reject(new TransportError("Already connected"));
       case ChannelState.ERROR:
-        return Promise.reject("Illegal state, ws connection failed previously");
+        return Promise.reject(
+          new TransportError("Illegal state, ws connection failed previously"),
+        );
     }
   }
+
   private doConnect(): Promise<RawLoginResponseBody> {
-    const { socket } = this;
     return new Promise((resolve, reject) => {
+      const socket = this.createSocket();
+      this.socket = socket;
+      this.pendingHandshake = { resolve, reject };
+      // R6：握手（open + connection request + login 往返）整体超时；0 关闭
+      if (this.handshakeTimeoutMs > 0) {
+        this.handshakeTimer = setTimeout(() => {
+          debugLog("handshake timed out after %dms", this.handshakeTimeoutMs);
+          const handshake = this.pendingHandshake;
+          this.pendingHandshake = undefined;
+          handshake?.reject(
+            new TransportError(
+              `Handshake timed out after ${this.handshakeTimeoutMs}ms`,
+            ),
+          );
+          // close 触发统一的断连处理（重试调度等）
+          socket.close();
+        }, this.handshakeTimeoutMs);
+      }
       if (socket.readyState === WebSocket.OPEN) {
         this.sendMessage(CONNECTION_REQUEST_MESSAGE);
       }
       socket.onopen = () => this.sendMessage(CONNECTION_REQUEST_MESSAGE);
       socket.onclose = (event) =>
-        debugLog("connection closed: ", event?.reason);
-      socket.onmessage = ({ data }) =>
-        this.onMessage(data as string, resolve, reject);
+        this.handleConnectionLost(socket, event?.reason || "socket closed");
+      socket.onerror = (err) => debugLog("socket error: %O", err);
+      socket.onmessage = ({ data }) => this.onMessage(data as string);
     });
   }
 
-  private onMessage(
-    data: string,
-    resolve: (value: RawLoginResponseBody) => void,
-    reject: (reason?: string) => void,
-  ) {
+  /**
+   * 统一的断连入口（close 事件 / 心跳看门狗判死 / 显式 close）。
+   * `this.socket !== socket` 的守卫忽略旧 socket 的迟到 close 事件，避免
+   * 迟到的 close 把刚建好的新连接误判为断开。
+   */
+  private handleConnectionLost(socket: WebSocket, reason: string) {
+    if (this.socket !== socket) return; // stale close from a previous attempt
+    this.socket = undefined;
+    this.state = ChannelState.DISCONNECTED;
+    this.clearHeartbeat();
+    this.clearHandshakeTimer();
+    debugLog("connection closed: %s", reason);
+    // 握手期间的断开：让 authenticate()/reconnect() 的调用方拿到错误
+    const handshake = this.pendingHandshake;
+    this.pendingHandshake = undefined;
+    handshake?.reject(
+      new TransportError(`Connection lost before login completed: ${reason}`),
+    );
+    // 一次性（promise 型）等待者：断开即 reject，重发重试是调用方的事
+    this.drainOneShots(`Connection lost: ${reason}`);
+    // 等待 SUBMIT 完成帧的调用方不应悬挂——同样 reject（Error 化）。
+    this.drainPendingSubmissions(
+      new TransportError(
+        `Connection closed before order submission completed: ${reason}`,
+      ),
+    );
+    const canRecover =
+      !this.explicitDisconnect &&
+      this.autoReconnect &&
+      this.hasAuthenticated &&
+      this.hasCredentials();
+    if (!canRecover) {
+      this.failReconnectPromise(
+        new TransportError(`Disconnected while reconnecting: ${reason}`),
+      );
+      if (this.explicitDisconnect) return; // disconnect() 自己会收尾
+      // 不再重连：结束流，让 for-await 循环干净退出
+      this.endBuffer();
+      return;
+    }
+    this.scheduleReconnect();
+  }
+
+  private onMessage(data: string) {
     const { responseParser, buffer } = this;
     let message: WsJsonRawMessage;
     // Isolate JSON.parse so a malformed frame cannot kill subsequent message handling.
@@ -272,10 +426,13 @@ export class RealWsJsonClient implements WsJsonClient {
     try {
       if (isConnectionResponse(message)) {
         this.authenticate();
+      } else if ("heartbeat" in message) {
+        // 心跳帧（实测线上约 2s 一次）：只用来重置看门狗
+        this.startHeartbeatWatchdog();
       } else if (isLoginResponse(message)) {
-        this.handleLoginResponse(message, resolve, reject);
+        this.handleLoginResponse(message);
       } else if (isSchwabLoginResponse(message)) {
-        this.handleSchwabLoginResponse(message, resolve, reject);
+        this.handleSchwabLoginResponse(message);
       } else {
         // SUBMIT 完成帧（orderId patch / error 帧）由原始拦截消费；
         // 其余（或 payload 里混有其他条目时）走通用解析。
@@ -305,23 +462,217 @@ export class RealWsJsonClient implements WsJsonClient {
       );
       this.sendMessage(handler.buildRequest(authCode));
     } else {
-      throwError("no credentials provided, cannot authenticate");
+      throw new AuthError("no credentials provided, cannot authenticate");
     }
   }
 
+  // ---- 重连与看门狗 ----
+
+  private hasCredentials(): boolean {
+    const { authCode, accessToken } = this.credentials;
+    return Boolean(authCode || accessToken);
+  }
+
+  private startHeartbeatWatchdog() {
+    this.clearHeartbeat();
+    if (this.heartbeatTimeoutMs <= 0) return;
+    this.heartbeatTimer = setTimeout(() => {
+      debugLog(
+        "heartbeat watchdog: no heartbeat for %dms, treating connection as dead",
+        this.heartbeatTimeoutMs,
+      );
+      // 假死链路：主动 close，走统一的断连→重连路径
+      this.socket?.close();
+    }, this.heartbeatTimeoutMs);
+  }
+
+  private clearHeartbeat() {
+    if (this.heartbeatTimer) {
+      clearTimeout(this.heartbeatTimer);
+      this.heartbeatTimer = undefined;
+    }
+  }
+
+  private clearHandshakeTimer() {
+    if (this.handshakeTimer) {
+      clearTimeout(this.handshakeTimer);
+      this.handshakeTimer = undefined;
+    }
+  }
+
+  private clearReconnectTimer() {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = undefined;
+    }
+  }
+
+  /** 指数退避（0.5s 起、30s 封顶、默认 ±20% 抖动）调度下一次重连 */
+  private scheduleReconnect() {
+    if (this.reconnectTimer || this.explicitDisconnect) return;
+    const attempt = this.reconnectAttempts++;
+    const base = Math.min(
+      this.reconnectBackoffInitialMs * 2 ** attempt,
+      this.reconnectBackoffMaxMs,
+    );
+    const jitter =
+      this.reconnectJitterRatio > 0
+        ? base * this.reconnectJitterRatio * Math.random()
+        : 0;
+    const delay = Math.min(base + jitter, this.reconnectBackoffMaxMs);
+    debugLog("scheduling reconnect attempt %d in %dms", attempt + 1, delay);
+    this.reconnectTimer = setTimeout(() => void this.attemptReconnect(), delay);
+  }
+
+  private async attemptReconnect() {
+    this.clearReconnectTimer();
+    if (
+      this.explicitDisconnect ||
+      this.state === ChannelState.CONNECTED ||
+      !this.hasCredentials()
+    ) {
+      this.failReconnectPromise(
+        new AuthError("Cannot reconnect without credentials"),
+      );
+      return;
+    }
+    this.state = ChannelState.CONNECTING;
+    // 登录成功后触发订阅重放（见 handleLoginResponse 成功路径）
+    this.pendingReplayAfterLogin = true;
+    try {
+      await this.doConnect();
+    } catch (e) {
+      debugLog("reconnect attempt failed: %O", e);
+      // 正常断连路径（handleConnectionLost/handleLoginFailure）已排队的
+      // 这里被 reconnectTimer 守卫短路；兜底覆盖 close 事件缺失的极端
+      // 情况（如 mock 环境），且仅当重连意图/自动重连策略仍成立时才继续。
+      if (
+        !this.explicitDisconnect &&
+        (this.reconnectPromise || (this.autoReconnect && this.hasAuthenticated))
+      ) {
+        this.scheduleReconnect();
+      }
+    }
+  }
+
+  /**
+   * 手动重连：立即断开当前连接（若有），以全新 WebSocket 走完
+   * 握手 → 登录 → 订阅重放。返回的 promise 在成功登录并恢复订阅后
+   * resolve；失败的尝试按指数退避持续重试，显式 disconnect() 则 reject。
+   */
+  reconnect(): Promise<void> {
+    if (this.reconnectPromise) return this.reconnectPromise;
+    this.clearReconnectTimer();
+    this.clearHeartbeat();
+    this.explicitDisconnect = false;
+    this.reconnectAttempts = 0;
+    if (this.bufferEnded) {
+      // 显式 disconnect 之后流已终结；重建缓冲供重放使用（旧消费者
+      // 的循环在 disconnect 时已干净退出，不会收到重放数据）。
+      this.buffer = new BufferedIterator<ParsedPayloadResponse>();
+      this.iterator = new MulticastIterator(this.buffer);
+      this.bufferEnded = false;
+    }
+    const promise = new Promise<void>((resolve, reject) => {
+      this.resolveReconnect = resolve;
+      this.rejectReconnect = reject;
+    });
+    this.reconnectPromise = promise;
+    if (!this.hasCredentials()) {
+      this.failReconnectPromise(
+        new AuthError("Cannot reconnect without credentials"),
+      );
+      return promise;
+    }
+    // 踢掉当前连接（若有）；close 事件因 socket 身份守卫被忽略
+    const current = this.socket;
+    this.socket = undefined;
+    const handshake = this.pendingHandshake;
+    this.pendingHandshake = undefined;
+    handshake?.reject(new TransportError("Reconnect requested"));
+    current?.close();
+    void this.attemptReconnect();
+    return promise;
+  }
+
+  /** 登录成功后的公共状态迁移（首轮与重连共用） */
+  private onLoginSuccess(body: RawLoginResponseBody) {
+    this.state = ChannelState.CONNECTED;
+    this.hasAuthenticated = true;
+    this.reconnectAttempts = 0;
+    this.clearHandshakeTimer();
+    this.startHeartbeatWatchdog();
+    const handshake = this.pendingHandshake;
+    this.pendingHandshake = undefined;
+    handshake?.resolve(body);
+    if (this.pendingReplayAfterLogin) {
+      this.pendingReplayAfterLogin = false;
+      this.replayActiveRequests();
+      const resolve = this.resolveReconnect;
+      this.reconnectPromise = undefined;
+      this.resolveReconnect = undefined;
+      this.rejectReconnect = undefined;
+      resolve?.();
+    }
+  }
+
+  /**
+   * 重连成功后按订阅顺序原样重发流式请求（service+id 不变，服务端
+   * 按 id 重建订阅）。一次性（promise 型）请求不在此列——它们在断开
+   * 时已 reject，重试是调用方的责任。
+   */
+  private replayActiveRequests() {
+    if (this.activeRequests.size === 0) return;
+    logger(
+      "replaying %d active subscription(s) after reconnect",
+      this.activeRequests.size,
+    );
+    for (const request of [...this.activeRequests.values()]) {
+      this.sendMessage(request);
+    }
+  }
+
+  /** 一次性（promise 型）等待者：断开即 reject，重发重试是调用方的事 */
+  private drainOneShots(reason: string) {
+    if (this.pendingOneShots.size === 0) return;
+    const waiters = [...this.pendingOneShots.values()];
+    this.pendingOneShots.clear();
+    const err = new TransportError(`Connection lost: ${reason}`);
+    for (const reject of waiters) reject(err);
+  }
+
+  private drainPendingSubmissions(err: Error) {
+    for (const [key, waiter] of this.pendingSubmissions) {
+      this.pendingSubmissions.delete(key);
+      waiter.reject(err);
+    }
+  }
+
+  private endBuffer() {
+    this.bufferEnded = true;
+    // This ensures that listeners will resolve the promise cleanly from any `for await` loops
+    this.buffer.end();
+  }
+
+  private failReconnectPromise(err: Error) {
+    const reject = this.rejectReconnect;
+    this.reconnectPromise = undefined;
+    this.resolveReconnect = undefined;
+    this.rejectReconnect = undefined;
+    reject?.(err);
+  }
+
   isConnected(): boolean {
-    const { socket, state } = this;
-    return socket !== null && state === ChannelState.CONNECTED;
+    return this.state === ChannelState.CONNECTED;
   }
 
   isConnecting(): boolean {
-    const { socket, state } = this;
-    return socket !== null && state === ChannelState.CONNECTING;
+    return this.state === ChannelState.CONNECTING;
   }
 
   ensureConnected() {
     if (this.state !== ChannelState.CONNECTED) {
-      throw new Error("Please call connect() first");
+      throw new TransportError("Please call connect() first");
     }
   }
 
@@ -343,9 +694,9 @@ export class RealWsJsonClient implements WsJsonClient {
   }
 
   searchInstruments(query: string): Promise<ParsedPayloadResponse> {
-    return this.dispatchHandler(InstrumentSearchMessageHandler, {
+    return this.dispatchOneShot(InstrumentSearchMessageHandler, {
       query,
-    }).promise();
+    });
   }
 
   lookupAlerts(): AsyncIterable<ParsedPayloadResponse> {
@@ -356,7 +707,7 @@ export class RealWsJsonClient implements WsJsonClient {
   }
 
   optionChain(symbol: string): Promise<ParsedPayloadResponse> {
-    return this.dispatchHandler(OptionSeriesMessageHandler, symbol).promise();
+    return this.dispatchOneShot(OptionSeriesMessageHandler, symbol);
   }
 
   optionChainQuotes(symbol: string): AsyncIterable<ParsedPayloadResponse> {
@@ -369,10 +720,7 @@ export class RealWsJsonClient implements WsJsonClient {
   optionChainDetails(
     request: OptionChainDetailsRequest,
   ): Promise<ParsedPayloadResponse> {
-    return this.dispatchHandler(
-      OptionChainDetailsMessageHandler,
-      request,
-    ).promise();
+    return this.dispatchOneShot(OptionChainDetailsMessageHandler, request);
   }
 
   optionQuotes(
@@ -399,33 +747,30 @@ export class RealWsJsonClient implements WsJsonClient {
   createAlert(
     request: CreateAlertRequestParams,
   ): Promise<ParsedPayloadResponse> {
-    return this.dispatchHandler(CreateAlertMessageHandler, request).promise();
+    return this.dispatchOneShot(CreateAlertMessageHandler, request);
   }
 
   cancelAlert(alertId: number): Promise<ParsedPayloadResponse> {
-    return this.dispatchHandler(CancelAlertMessageHandler, alertId).promise();
+    return this.dispatchOneShot(CancelAlertMessageHandler, alertId);
   }
 
   cancelOrder(orderId: number): Promise<ParsedPayloadResponse> {
-    return this.dispatchHandler(CancelOrderMessageHandler, orderId).promise();
+    return this.dispatchOneShot(CancelOrderMessageHandler, orderId);
   }
 
   watchlist(watchlistId: number): Promise<ParsedPayloadResponse> {
-    return this.dispatchHandler(
-      GetWatchlistMessageHandler,
-      watchlistId,
-    ).promise();
+    return this.dispatchOneShot(GetWatchlistMessageHandler, watchlistId);
   }
 
   // ---- 账户域（agent/07，probe-2026-10-13 实测背书）----
   // Promise 型门面统一取首个 snapshot；error 帧经 dispatch 自动 reject。
 
   getAccounts(): Promise<ParsedPayloadResponse> {
-    return this.dispatchHandler(AccountsMessageHandler, undefined).promise();
+    return this.dispatchOneShot(AccountsMessageHandler, undefined);
   }
 
   getStatement(account: string): Promise<ParsedPayloadResponse> {
-    return this.dispatchHandler(StatementMessageHandler, account).promise();
+    return this.dispatchOneShot(StatementMessageHandler, account);
   }
 
   getPositions(accountNumber: string): AsyncIterable<ParsedPayloadResponse> {
@@ -433,24 +778,21 @@ export class RealWsJsonClient implements WsJsonClient {
   }
 
   getMarginCalls(): Promise<ParsedPayloadResponse> {
-    return this.dispatchHandler(MarginCallsMessageHandler, undefined).promise();
+    return this.dispatchOneShot(MarginCallsMessageHandler, undefined);
   }
 
   getMarketHours(
     request: MarketHoursRequestParams,
   ): Promise<ParsedPayloadResponse> {
-    return this.dispatchHandler(MarketHoursMessageHandler, request).promise();
+    return this.dispatchOneShot(MarketHoursMessageHandler, request);
   }
 
   getDisclosures(): Promise<ParsedPayloadResponse> {
-    return this.dispatchHandler(DisclosuresMessageHandler, undefined).promise();
+    return this.dispatchOneShot(DisclosuresMessageHandler, undefined);
   }
 
   getMessageCenter(): Promise<ParsedPayloadResponse> {
-    return this.dispatchHandler(
-      MessageCenterGetMessageHandler,
-      undefined,
-    ).promise();
+    return this.dispatchOneShot(MessageCenterGetMessageHandler, undefined);
   }
 
   subscribeMessageCenter(): AsyncIterable<ParsedPayloadResponse> {
@@ -466,7 +808,7 @@ export class RealWsJsonClient implements WsJsonClient {
     draft: PlaceLimitOrderRequestParams,
   ): Promise<ParsedPayloadResponse> {
     // W1：CONFIRM ver=1，id=update-draft-order-<SYMBOL>，返回草稿 snapshot。
-    return this.dispatchHandler(PlaceOrderMessageHandler, draft).promise();
+    return this.dispatchOneShot(PlaceOrderMessageHandler, draft);
   }
 
   submitOrder(
@@ -507,7 +849,7 @@ export class RealWsJsonClient implements WsJsonClient {
   ): Promise<ParsedPayloadResponse> {
     // 改单（W3）：EDIT_ORDER + refOrderId，id 用 edit-order-<SYMBOL>。
     // 复用 SubmitOrderMessageHandler——refOrderId 存在时它走改单分支。
-    return this.dispatchHandler(SubmitOrderMessageHandler, request).promise();
+    return this.dispatchOneShot(SubmitOrderMessageHandler, request);
   }
 
   // ---- 自选列表（write-2026-10-13 W5 系列实测）----
@@ -515,42 +857,27 @@ export class RealWsJsonClient implements WsJsonClient {
   getWatchlists(
     request: WatchlistCategoriesRequestParams,
   ): Promise<ParsedPayloadResponse> {
-    return this.dispatchHandler(
-      WatchlistCategoriesMessageHandler,
-      request,
-    ).promise();
+    return this.dispatchOneShot(WatchlistCategoriesMessageHandler, request);
   }
 
   createWatchlist(
     request: WatchlistCreateRequestParams,
   ): Promise<ParsedPayloadResponse> {
-    return this.dispatchHandler(
-      WatchlistCreateMessageHandler,
-      request,
-    ).promise();
+    return this.dispatchOneShot(WatchlistCreateMessageHandler, request);
   }
 
   renameWatchlist(
     request: WatchlistRenameRequestParams,
   ): Promise<ParsedPayloadResponse> {
-    return this.dispatchHandler(
-      WatchlistRenameMessageHandler,
-      request,
-    ).promise();
+    return this.dispatchOneShot(WatchlistRenameMessageHandler, request);
   }
 
   deleteWatchlist(watchlistId: number): Promise<ParsedPayloadResponse> {
-    return this.dispatchHandler(
-      WatchlistDeleteMessageHandler,
-      watchlistId,
-    ).promise();
+    return this.dispatchOneShot(WatchlistDeleteMessageHandler, watchlistId);
   }
 
   userProperties(): Promise<ParsedPayloadResponse> {
-    return this.dispatchHandler(
-      UserPropertiesMessageHandler,
-      null as never,
-    ).promise();
+    return this.dispatchOneShot(UserPropertiesMessageHandler, null as never);
   }
 
   marketDepth(symbol: string): AsyncIterable<ParsedPayloadResponse> {
@@ -563,7 +890,6 @@ export class RealWsJsonClient implements WsJsonClient {
   ): Observable<NonNullable<ParsedPayloadResponse>> {
     this.ensureConnected();
     const request = handler.buildRequest(args);
-    this.sendMessage(request);
     // Correlate responses with this request using the header echoed by the
     // server: the request's service name plus its id. Using the service name
     // from the built request (instead of `handler.service`) keeps routing
@@ -571,6 +897,57 @@ export class RealWsJsonClient implements WsJsonClient {
     // the one it actually sends.
     const { service: requestService, id: requestId } =
       request.payload?.[0]?.header ?? {};
+    this.sendMessage(request);
+    // 流式订阅登记：重连成功并重新 login 后原样重发（见 replayActiveRequests）
+    if (requestService && requestId) {
+      this.activeRequests.set(`${requestService}$${requestId}`, request);
+    }
+    return this.responseObservable(requestService, requestId);
+  }
+
+  /**
+   * 一次性（promise 型）请求。与流式 dispatch 的关键区别：断开时等待者被
+   * reject（TransportError），重连后 **不** 重放——重发写操作的后果由调用
+   * 方承担是不可接受的，重试是调用方的责任。
+   */
+  private dispatchOneShot<Req>(
+    handlerCtor: Constructor<WebSocketApiMessageHandler<Req>>,
+    args: Req,
+  ): Promise<ParsedPayloadResponse> {
+    const handler = findByTypeOrThrow(messageHandlers, handlerCtor);
+    this.ensureConnected();
+    const request = handler.buildRequest(args);
+    const { service: requestService, id: requestId } =
+      request.payload?.[0]?.header ?? {};
+    return new Promise<ParsedPayloadResponse>((resolve, reject) => {
+      const key =
+        requestService && requestId
+          ? `${requestService}$${requestId}`
+          : undefined;
+      if (key) {
+        this.pendingOneShots.set(key, (err) => reject(err));
+      }
+      this.sendMessage(request);
+      this.responseObservable(requestService, requestId)
+        .promise()
+        .then(
+          (value) => {
+            if (key) this.pendingOneShots.delete(key);
+            resolve(value);
+          },
+          (err) => {
+            if (key) this.pendingOneShots.delete(key);
+            reject(err);
+          },
+        );
+    });
+  }
+
+  /** 按 service+id 过滤已解析流的公共逻辑（error 条目抛 WebSocketApiError） */
+  private responseObservable(
+    requestService: string | undefined,
+    requestId: string | undefined,
+  ): Observable<NonNullable<ParsedPayloadResponse>> {
     return deferredWrap(() => this.iterator).filter((msg) => {
       if (!isResponseForRequest(msg, requestService, requestId)) {
         return false;
@@ -655,11 +1032,7 @@ export class RealWsJsonClient implements WsJsonClient {
     this.socket?.send(msg);
   }
 
-  private handleSchwabLoginResponse(
-    message: RawLoginResponse,
-    resolve: (value: RawLoginResponseBody) => void,
-    reject: (reason?: string) => void,
-  ) {
+  private handleSchwabLoginResponse(message: RawLoginResponse) {
     const handler = findByTypeOrThrow(
       messageHandlers,
       SchwabLoginMessageHandler,
@@ -667,36 +1040,56 @@ export class RealWsJsonClient implements WsJsonClient {
     const loginResponse = handler.parseResponse(message as RawPayloadResponse);
     const [{ body }] = message.payload;
     if (loginResponse.authenticated) {
-      this.state = ChannelState.CONNECTED;
       logger("Schwab login successful, token=%s", body.token);
       this.credentials.accessToken = body.token;
       if (loginResponse.refreshToken) {
         this.credentials.refreshToken = loginResponse.refreshToken;
       }
-      resolve(body);
+      this.onLoginSuccess(body);
     } else {
-      this.state = ChannelState.ERROR;
-      reject(`Login failed: ${body.message}`);
-      this.disconnect();
+      this.handleLoginFailure(body);
     }
   }
 
-  private handleLoginResponse(
-    message: RawLoginResponse,
-    resolve: (value: RawLoginResponseBody) => void,
-    reject: (reason?: string) => void,
-  ) {
+  private handleLoginResponse(message: RawLoginResponse) {
     const handler = findByTypeOrThrow(messageHandlers, LoginMessageHandler);
     const loginResponse = handler.parseResponse(message as RawPayloadResponse);
     const [{ body }] = message.payload;
     if (loginResponse.successful) {
-      this.state = ChannelState.CONNECTED;
-      resolve(body);
+      this.onLoginSuccess(body);
     } else {
-      this.state = ChannelState.ERROR;
-      reject(`Login failed: ${body.message}`);
-      this.disconnect();
+      this.handleLoginFailure(body);
     }
+  }
+
+  /**
+   * 登录失败（R6：AuthError 替代旧的字符串 reject）。首轮认证：置 ERROR、
+   * 关闭连接、终结流（与旧行为一致，凭据错误不自动重试）。重连尝试中：
+   * 按退避继续重试——token 可能只是暂时失效。
+   */
+  private handleLoginFailure(body: { message?: string }) {
+    this.clearHandshakeTimer();
+    this.clearHeartbeat();
+    const err = new AuthError(`Login failed: ${body.message}`);
+    const wasReconnectAttempt = this.pendingReplayAfterLogin;
+    this.pendingReplayAfterLogin = false;
+    const handshake = this.pendingHandshake;
+    this.pendingHandshake = undefined;
+    // 先摘掉 this.socket 再 close：close 事件被身份守卫忽略，
+    // 避免走自动重连路径（此处自行决策重试策略）。
+    const socket = this.socket;
+    this.socket = undefined;
+    this.state = ChannelState.ERROR;
+    handshake?.reject(err);
+    socket?.close();
+    if (wasReconnectAttempt) {
+      this.scheduleReconnect();
+      return;
+    }
+    this.failReconnectPromise(err);
+    this.drainOneShots(err.message);
+    this.drainPendingSubmissions(err);
+    if (!this.bufferEnded) this.endBuffer();
   }
 
   private dispatchHandler<Req>(
@@ -708,16 +1101,28 @@ export class RealWsJsonClient implements WsJsonClient {
   }
 
   disconnect() {
-    this.socket?.close();
+    this.explicitDisconnect = true;
+    this.clearReconnectTimer();
+    this.clearHeartbeat();
+    this.clearHandshakeTimer();
+    this.pendingReplayAfterLogin = false;
+    // 显式断开后不再重连，旧订阅的消费者已随 buffer.end() 退出；
+    // 清空登记表，避免 reconnect() 向新会话重放无人认领的请求。
+    this.activeRequests.clear();
+    const socket = this.socket;
+    this.socket = undefined;
     this.state = ChannelState.DISCONNECTED;
+    // 先摘 socket 再 close：close 事件被身份守卫忽略，收尾在此统一做
+    socket?.close();
     // 等待 SUBMIT 完成帧的调用方不应悬挂——连接断开时全部 reject。
-    for (const [key, waiter] of this.pendingSubmissions) {
-      this.pendingSubmissions.delete(key);
-      waiter.reject(
-        new Error("Connection closed before order submission completed."),
-      );
-    }
-    // This ensures that listeners will resolve the promise cleanly from any `for await` loops
-    this.buffer.end();
+    this.drainPendingSubmissions(
+      new TransportError(
+        "Connection closed before order submission completed.",
+      ),
+    );
+    this.failReconnectPromise(
+      new TransportError("Disconnected while reconnecting"),
+    );
+    if (!this.bufferEnded) this.endBuffer();
   }
 }

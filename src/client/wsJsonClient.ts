@@ -32,6 +32,12 @@ export interface WsJsonClient extends Disposable {
 
   ensureConnected(): void;
 
+  /**
+   * 以全新 WebSocket 连接重走握手→登录→流式订阅重放。成功登录后 resolve。
+   * 一次性（promise 型）请求不会自动重发——断开时它们已 reject。
+   */
+  reconnect(): Promise<void>;
+
   quotes(symbols: string[]): AsyncIterable<ParsedPayloadResponse>;
 
   accountPositions(accountNumber: string): AsyncIterable<ParsedPayloadResponse>;
