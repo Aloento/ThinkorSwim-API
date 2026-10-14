@@ -64,7 +64,7 @@ export type OrderHistoryEntryField = (typeof ORDER_ENTRY_FIELDS)[number];
 //  - 必须提供 startTime+endTime 时间对，或 orderId；
 //  - orderEntryFields 与 legFields 至少一个非空；
 //  - 窗口 ≤ 370 天（含两端），startTime 不得晚于当前时间；
-//  - account 必须是真实账户 code（如 "D-12345678"，见 06 号文档 F6；
+//  - account 必须是真实账户 code（如 "D-XXXXXXXX"，本地录制实测；
 //    "COMBINED ACCOUNT" 报 error "Invalid account number"，第 6 帧）。
 export type OrderHistoryRequestParams = {
   account: string;

@@ -6,7 +6,7 @@ import SubmitOrderMessageHandler, {
 } from "../../client/services/submitOrderMessageHandler";
 
 const base = {
-  accountNumber: "D-12345678",
+  accountNumber: "D-12345678", // 测试占位（非真实账户）
   symbol: "AAPL",
   quantity: 1,
 };

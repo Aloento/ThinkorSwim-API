@@ -31,7 +31,7 @@ export type TaxLotField = (typeof TAX_LOT_FIELDS)[number];
 //  - guest 会话报 "Account lots lookup is not allowed for the current
 //    user"（第 4/5 帧）——真实账户待测。
 export type TaxLotGetRequestParams = {
-  // 真实账户 code（如 "D-12345678"，参照 order_history；probe 用
+  // 真实账户 code（如 "D-XXXXXXXX"，参照 order_history；probe 用
   // "COMBINED ACCOUNT" 报的是权限错误，无法区分格式校验，保守用真实 code）
   account: string;
   symbol: string;
