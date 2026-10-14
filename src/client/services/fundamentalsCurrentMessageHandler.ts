@@ -57,12 +57,16 @@ const FUNDAMENTALS_FIELDS = [
 
 export type FundamentalsField = (typeof FUNDAMENTALS_FIELDS)[number];
 
+// task-17 实测（agent/artifacts/exp-t17/exp-t17.jsonl t17-9）：非法值错误帧
+// 自曝枚举 "Possible enum values are [QUARTERLY, ANNUAL]"。
+export type FundamentalsTime = "QUARTERLY" | "ANNUAL";
+
 // 服务端校验（第 1 帧错误帧）："$.params.fields: must not be empty;
 // $.params.time: must not be null"——两者必传。
 export type FundamentalsCurrentRequestParams = {
   symbol: string;
-  // 实测值 "QUARTERLY"；其余取值未探测
-  time: string;
+  // task-17 实测枚举 [QUARTERLY, ANNUAL]，ANNUAL 实测 snapshot 成功（t17-10）。
+  time: FundamentalsTime;
   fields: FundamentalsField[];
 };
 
