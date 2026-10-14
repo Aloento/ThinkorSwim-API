@@ -2,16 +2,11 @@
 import { readdirSync, readFileSync } from "node:fs";
 
 const dir = "src/client/services";
-const reg = readFileSync("src/client/realWsJsonClient.ts", "utf8");
 const facade = readFileSync("src/client/wsJsonClient.ts", "utf8");
 
 // 门面实际 import 的 handler 文件名集合（去掉扩展名比较）
 const facadeFiles = new Set(
   [...facade.matchAll(/services\/(\w+)\.js/g)].map((m) => m[1]),
-);
-// real client 注册的 handler 类名集合
-const registeredClasses = new Set(
-  [...reg.matchAll(/new (\w+)/g)].map((m) => m[1]),
 );
 
 const rows = [];
