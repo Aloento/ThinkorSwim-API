@@ -63,7 +63,6 @@ ws.on("message", (d) => {
     return;
   }
   for (const e of msg.payload ?? []) {
-    const s = e.header?.service ?? "";
     if (stage >= 2) {
       console.log(
         "any-frame:",
