@@ -56,9 +56,9 @@ src/
 │   ├── messageTypeHelpers.ts # 帧分类（payload 空防御）
 │   └── services/*.ts         # 68 个服务 handler（每个=一个 wire 服务的参数/响应建模）
 ├── example/testApp.ts        # 用户名密码路径 + 代理示例 + guest 冒烟
-└── test/**                   # jest：帧回放 / 连接生命周期 / guard / 归一化 等（112 用例）
+└── test/**                   # jest：帧回放 / 连接生命周期 / guard / 归一化 等
 scripts/                      # 黑盒工具（见 §8）
-docs/TECHNICAL.md             # 本文
+TECHNICAL.md                  # 本文
 ```
 
 核心运行时机制：
