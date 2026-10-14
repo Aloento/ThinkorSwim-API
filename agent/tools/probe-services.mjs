@@ -453,7 +453,15 @@ const PROBES = [
   {
     service: "transactions/categories",
     id: "probe-txn-cats",
-    params: { account: "COMBINED ACCOUNT" },
+    // 真实账户实测需 6 参数（exp-tc.mjs）；guest 仍可能校验错误
+    params: {
+      account: "COMBINED ACCOUNT",
+      startTime: Math.floor(Date.now() / 1000) - 30 * 24 * 3600,
+      endTime: Math.floor(Date.now() / 1000),
+      transactionCategories: [],
+      cryptoTransactionTypes: [],
+      cashFutureTransactionTypes: [],
+    },
     waitMs: 3000,
   },
   {
