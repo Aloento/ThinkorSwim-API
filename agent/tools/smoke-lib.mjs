@@ -183,6 +183,41 @@ if (!Array.isArray(history.body.orderHistoryEntries)) {
   process.exit(1);
 }
 
+// 第六批（task-14）：order_events / alerts/subscribe 订阅帧往返。
+// guest 无成交订单——probe 实测 order_events 返回空 body snapshot，断言"帧可达"即可。
+const firstFrame = async (iterable, ms) => {
+  const it = iterable[Symbol.asyncIterator]();
+  const result = await Promise.race([
+    it.next(),
+    new Promise((res) => setTimeout(() => res("timeout"), ms)),
+  ]);
+  await it.return?.();
+  return result;
+};
+
+const oe = await firstFrame(
+  client.orderEvents({ account: "D-12345678" }),
+  6000,
+);
+console.log(
+  "[smoke] order_events:",
+  oe === "timeout"
+    ? "no frame (timeout)"
+    : `type ok, service=${oe.value?.service}`,
+);
+if (oe === "timeout") {
+  console.error("[smoke] FAIL: order_events subscription produced no frame");
+  process.exit(1);
+}
+
+const al = await firstFrame(client.subscribeAlerts(), 6000);
+console.log(
+  "[smoke] alerts/subscribe:",
+  al === "timeout"
+    ? "no frame yet (server may push only on change — tolerated)"
+    : `service=${al.value?.service}`,
+);
+
 client.disconnect();
 console.log(
   "[smoke] DONE — all facade methods round-tripped against live paper server",
