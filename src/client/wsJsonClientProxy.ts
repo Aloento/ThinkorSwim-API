@@ -65,7 +65,7 @@ const logger = debug("wsClientProxy");
 export const ALL_REQUESTS = [
   "authenticateWithAuthCode",
   "authenticateWithAccessToken",
-  "optionChainQuotes",
+  // A6（agent/03）：optionChainQuotes 曾在 68/78 行重复出现两次，去重
   "disconnect",
   "reconnect",
   "quotes",
