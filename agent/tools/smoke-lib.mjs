@@ -18,16 +18,30 @@ if (!token) {
 
 const client = new RealWsJsonClient({ wsUrl: PAPER_WS_URL });
 const login = await client.authenticateWithAccessToken({ accessToken: token });
-console.log("[smoke] login OK:", login?.authenticationStatus, "user=", login?.userCode);
+console.log(
+  "[smoke] login OK:",
+  login?.authenticationStatus,
+  "user=",
+  login?.userCode,
+);
 
 const accounts = await client.getAccounts();
-console.log("[smoke] accounts:", accounts.body.items?.map((a) => a.code).join(","));
+console.log(
+  "[smoke] accounts:",
+  accounts.body.items?.map((a) => a.code).join(","),
+);
 
 const statement = await client.getStatement("COMBINED ACCOUNT");
 console.log("[smoke] statement NET_LIQ:", statement.body.values?.NET_LIQ);
 
-const mh = await client.getMarketHours(["EQUITY"], new Date().toISOString().slice(0, 10));
-console.log("[smoke] market_hours EQUITY isOpen:", mh.body.schwabMarketHours?.EQUITY?.EQ?.isOpen);
+const mh = await client.getMarketHours(
+  ["EQUITY"],
+  new Date().toISOString().slice(0, 10),
+);
+console.log(
+  "[smoke] market_hours EQUITY isOpen:",
+  mh.body.schwabMarketHours?.EQUITY?.EQ?.isOpen,
+);
 
 const quotes = client.quotes(["AAPL", "SPY"]);
 for await (const q of quotes) {
@@ -42,12 +56,23 @@ for await (const q of quotes) {
 
 const cats = await client.getWatchlists(["PUBLIC"]);
 const wl = cats.body.categories?.[0]?.watchlists?.[0];
-console.log("[smoke] watchlists:", cats.body.categories?.[0]?.name, wl ? `first=${wl.name}(${wl.id})` : "(none)");
+console.log(
+  "[smoke] watchlists:",
+  cats.body.categories?.[0]?.name,
+  wl ? `first=${wl.name}(${wl.id})` : "(none)",
+);
 if (wl) {
   const one = await client.watchlist(wl.id);
-  console.log("[smoke] watchlist/get:", one.body.watchlist?.name, "symbols=", one.body.watchlist?.symbols?.length);
+  console.log(
+    "[smoke] watchlist/get:",
+    one.body.watchlist?.name,
+    "symbols=",
+    one.body.watchlist?.symbols?.length,
+  );
 }
 
 client.disconnect();
-console.log("[smoke] DONE — all facade methods round-tripped against live paper server");
+console.log(
+  "[smoke] DONE — all facade methods round-tripped against live paper server",
+);
 process.exit(0);

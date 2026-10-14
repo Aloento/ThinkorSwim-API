@@ -36,7 +36,10 @@ try {
   client.disconnect();
   process.exit(1);
 }
-console.log("[order] placeOrder RESOLVED (T1 fix on live server):", JSON.stringify(placed?.body).slice(0, 160));
+console.log(
+  "[order] placeOrder RESOLVED (T1 fix on live server):",
+  JSON.stringify(placed?.body).slice(0, 160),
+);
 
 const orderId = placed?.body?.orderId;
 if (orderId && orderId > 0) {
@@ -44,7 +47,10 @@ if (orderId && orderId > 0) {
   const c = await client.cancelOrder(orderId);
   console.log("[order] cancel result:", c?.body?.result);
 } else {
-  console.log("[order] no orderId in response body — inspect:", JSON.stringify(placed).slice(0, 400));
+  console.log(
+    "[order] no orderId in response body — inspect:",
+    JSON.stringify(placed).slice(0, 400),
+  );
 }
 
 client.disconnect();
