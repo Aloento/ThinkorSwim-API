@@ -127,7 +127,12 @@ import OptionQuotesMessageHandler, {
 } from "./services/optionQuotesMessageHandler.js";
 import OptionSeriesMessageHandler from "./services/optionSeriesMessageHandler.js";
 import OptionSeriesQuotesMessageHandler from "./services/optionSeriesQuotesMessageHandler.js";
-import OrderEventsMessageHandler from "./services/orderEventsMessageHandler.js";
+import OrderEventsMessageHandler, {
+  NormalizedOrderEvent,
+  OrderEventsRequestParams,
+  RawOrderEvent,
+  normalizeOrderEvent,
+} from "./services/orderEventsMessageHandler.js";
 import PlaceOrderMessageHandler, {
   PlaceLimitOrderRequestParams,
 } from "./services/placeOrderMessageHandler.js";
@@ -139,7 +144,9 @@ import SubmitOrderMessageHandler, {
   ReplaceOrderRequestParams,
   SubmitDraftOrderRequestParams,
 } from "./services/submitOrderMessageHandler.js";
-import SubscribeToAlertMessageHandler from "./services/subscribeToAlertMessageHandler.js";
+import SubscribeToAlertMessageHandler, {
+  DEFAULT_ALERT_TYPES,
+} from "./services/subscribeToAlertMessageHandler.js";
 import UserPropertiesMessageHandler from "./services/userPropertiesMessageHandler.js";
 import WatchlistAddMessageHandler from "./services/watchlistAddMessageHandler.js";
 import WatchlistCategoriesMessageHandler, {
@@ -205,6 +212,7 @@ import {
 } from "./util.js";
 import { WsJsonClient } from "./wsJsonClient.js";
 import Authenticator from "../auth/authenticator.js";
+import { GuardOptions, GuardOrderCheck, OrderGuard } from "./guard.js";
 
 export const CONNECTION_REQUEST_MESSAGE = {
   ver: "27.*.*",
@@ -226,6 +234,9 @@ const messageHandlers: WebSocketApiMessageHandler<never>[] = [
   new CreateAlertMessageHandler(),
   new AlertLookupMessageHandler(),
   new SubscribeToAlertMessageHandler(),
+  // task-14C：workingOrders 此前 new 局部 handler（绕过查表），现注册后
+  // 统一走 dispatchHandler（与其余门面一致）。
+  new WorkingOrdersMessageHandler(),
   new OptionQuotesMessageHandler(),
   new CancelOrderMessageHandler(),
   new ChartMessageHandler(),
@@ -339,6 +350,13 @@ export type RealWsJsonClientOptions = {
    * "No subscription" 等错误静默忽略。测试可关。
    */
   autoUnsubscribe?: boolean;
+  /**
+   * 交易安全闸门（task-14D）：confirmOrder/submitOrder/replaceOrder/
+   * cancelOrder 入口前置校验，不通过抛 GuardError。默认 undefined =
+   * 不启用（零行为变化）。paperOnly 判定本会话 wsUrl 是否
+   * papermoney-services 端点，详见 src/client/guard.ts。
+   */
+  guard?: GuardOptions;
 };
 
 export class RealWsJsonClient implements WsJsonClient {
@@ -366,6 +384,8 @@ export class RealWsJsonClient implements WsJsonClient {
    * accessToken（跨 24h 的重连不会拿旧 token 去登录）。
    */
   private authenticator?: Authenticator;
+  /** 交易安全闸门（task-14D）；未配置 guard 时为 undefined = 不启用 */
+  private readonly guard?: OrderGuard;
   /** 本轮 authenticate() 是否正在等 refresh（防 close 竞态的迟到续发登录帧） */
   private loginAttemptId = 0;
   /** 构造时注入的 socket（测试注入用）；仅首次连接消费，重连一律走工厂 */
@@ -432,6 +452,13 @@ export class RealWsJsonClient implements WsJsonClient {
     );
     this.autoReconnect = options.autoReconnect ?? true;
     this.autoUnsubscribe = options.autoUnsubscribe ?? true;
+    this.guard = options.guard
+      ? new OrderGuard(
+          options.guard,
+          // 模拟盘判定：wsUrl 含 papermoney-services（PAPER_WS_URL）
+          (options.wsUrl ?? DEFAULT_WS_URL).includes("papermoney-services"),
+        )
+      : undefined;
   }
 
   private static buildHeaders(
@@ -959,6 +986,21 @@ export class RealWsJsonClient implements WsJsonClient {
     ).iterable();
   }
 
+  /**
+   * alerts/subscribe 告警事件流（task-14B，03 A4 复开口）：handler 早已
+   * 存在但只注册未派发（audit-coverage v2 证伪了"已接入"的记载）。
+   * alertTypes 缺省 DEFAULT_ALERT_TYPES（CHANGED/TRIGGERED/EXPIRED/
+   * MULTIPLE_EXPIRED），实测帧见 agent/artifacts/watch2-console.txt。
+   */
+  subscribeAlerts(
+    alertTypes: string[] = DEFAULT_ALERT_TYPES,
+  ): AsyncIterable<ParsedPayloadResponse> {
+    return this.dispatchHandler(
+      SubscribeToAlertMessageHandler,
+      alertTypes,
+    ).iterable();
+  }
+
   optionChain(symbol: string): Promise<ParsedPayloadResponse> {
     return this.dispatchOneShot(OptionSeriesMessageHandler, symbol);
   }
@@ -993,8 +1035,38 @@ export class RealWsJsonClient implements WsJsonClient {
   }
 
   workingOrders(accountNumber: string): AsyncIterable<ParsedPayloadResponse> {
-    const handler = new WorkingOrdersMessageHandler();
-    return this.dispatch(handler, accountNumber).iterable();
+    // task-14C：改查表派发（此前 new 局部 handler，风格分裂；handler 类
+    // 无状态，两种写法运行时等价）。
+    return this.dispatchHandler(
+      WorkingOrdersMessageHandler,
+      accountNumber,
+    ).iterable();
+  }
+
+  /**
+   * order_events 原始事件流（task-14A）：body.orders[] 为 wire 原样事件
+   * （RawOrderEvent[]，patch 已在 dataStore 合并进 snapshot 基底）。
+   * 需要稳定状态枚举用 observeOrders()。
+   */
+  orderEvents(
+    request: OrderEventsRequestParams,
+  ): AsyncIterable<ParsedPayloadResponse> {
+    return this.dispatchHandler(OrderEventsMessageHandler, request).iterable();
+  }
+
+  /**
+   * 归一化订单事件流（task-14A）：每条 order_events 响应里的 orders[]
+   * 逐条 normalizeOrderEvent 展平（一个 snapshot 可能携带多条事件）。
+   * status 归一化取值与映射依据见 NormalizedOrderStatus 注释。
+   */
+  async *observeOrders(account: string): AsyncIterable<NormalizedOrderEvent> {
+    for await (const response of this.orderEvents({ account })) {
+      const orders = (response.body as { orders?: RawOrderEvent[] })?.orders;
+      if (!orders) continue;
+      for (const raw of orders) {
+        yield normalizeOrderEvent(raw);
+      }
+    }
   }
 
   createAlert(
@@ -1008,6 +1080,14 @@ export class RealWsJsonClient implements WsJsonClient {
   }
 
   cancelOrder(orderId: number): Promise<ParsedPayloadResponse> {
+    // 撤单无账户/金额上下文：闸门仅做会话级 paperOnly 校验（guard.ts）。
+    if (this.guard) {
+      try {
+        this.guard.validateCancel("cancelOrder");
+      } catch (e) {
+        return Promise.reject(e as Error);
+      }
+    }
     return this.dispatchOneShot(CancelOrderMessageHandler, orderId);
   }
 
@@ -1061,6 +1141,8 @@ export class RealWsJsonClient implements WsJsonClient {
     draft: PlaceLimitOrderRequestParams,
   ): Promise<ParsedPayloadResponse> {
     // W1：CONFIRM ver=1，id=update-draft-order-<SYMBOL>，返回草稿 snapshot。
+    const rejected = this.checkOrderGuard("confirmOrder", draft);
+    if (rejected) return rejected;
     return this.dispatchOneShot(PlaceOrderMessageHandler, draft);
   }
 
@@ -1076,6 +1158,8 @@ export class RealWsJsonClient implements WsJsonClient {
     // GenericIncomingMessageHandler 对无 base 的 patch 会丢弃该条目。
     // 因此这里在 onMessage 里直接拦截原始帧（见 checkPendingSubmissions），
     // 不经过已解析流；error 帧同样在此 reject。
+    const rejected = this.checkOrderGuard("submitOrder", draft);
+    if (rejected) return rejected;
     this.ensureConnected();
     const handler = findByTypeOrThrow(
       messageHandlers,
@@ -1102,7 +1186,29 @@ export class RealWsJsonClient implements WsJsonClient {
   ): Promise<ParsedPayloadResponse> {
     // 改单（W3）：EDIT_ORDER + refOrderId，id 用 edit-order-<SYMBOL>。
     // 复用 SubmitOrderMessageHandler——refOrderId 存在时它走改单分支。
+    const rejected = this.checkOrderGuard("replaceOrder", request);
+    if (rejected) return rejected;
     return this.dispatchOneShot(SubmitOrderMessageHandler, request);
+  }
+
+  /**
+   * 交易闸门统一入口（task-14D）：命中 GuardError 时返回 **已 reject 的
+   * Promise**（而非同步抛出）——写操作返回 Promise 的门面方法以 rejection
+   * 报告失败，await 调用方拿到的语义一致，也不会让闸门命中绕过
+   * `.catch`/`.then(_, onReject)` 风格调用点。未配置 guard 或校验通过
+   * 返回 undefined。
+   */
+  private checkOrderGuard(
+    op: string,
+    order: GuardOrderCheck,
+  ): Promise<ParsedPayloadResponse> | undefined {
+    if (!this.guard) return undefined;
+    try {
+      this.guard.validateOrder(op, order);
+      return undefined;
+    } catch (e) {
+      return Promise.reject(e as Error);
+    }
   }
 
   // ---- 自选列表（write-2026-10-13 W5 系列实测）----

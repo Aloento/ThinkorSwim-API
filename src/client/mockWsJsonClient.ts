@@ -36,6 +36,13 @@ import { NewsHeadersGetRelevantRequestParams } from "./services/newsHeadersGetRe
 import { NewsHeadersSubscribeRequestParams } from "./services/newsHeadersSubscribeMessageHandler.js";
 import { OptionChainDetailsRequest } from "./services/optionChainDetailsMessageHandler.js";
 import { OptionQuotesRequestParams } from "./services/optionQuotesMessageHandler.js";
+import {
+  NormalizedOrderEvent,
+  OrderEventsRequestParams,
+  OrderEventsSnapshotResponse,
+  RawOrderEvent,
+  normalizeOrderEvent,
+} from "./services/orderEventsMessageHandler.js";
 import { PlaceLimitOrderRequestParams } from "./services/placeOrderMessageHandler.js";
 import { QuotesGetRequestParams } from "./services/quotesGetMessageHandler.js";
 import { ScanFilterGetRequestParams } from "./services/scanFilterGetMessageHandler.js";
@@ -248,6 +255,38 @@ export default class MockWsJsonClient implements WsJsonClient {
     return yield {
       body: {},
       service: "order_events",
+    };
+  }
+
+  async *orderEvents(
+    _: OrderEventsRequestParams,
+  ): AsyncIterable<ParsedPayloadResponse> {
+    const fixture: OrderEventsSnapshotResponse = {
+      service: "order_events",
+      orders: [],
+    };
+    return yield {
+      body: fixture,
+      service: "order_events",
+    };
+  }
+
+  async *observeOrders(account: string): AsyncIterable<NormalizedOrderEvent> {
+    for await (const response of this.orderEvents({ account })) {
+      const orders = (response.body as { orders?: RawOrderEvent[] })?.orders;
+      if (!orders) continue;
+      for (const raw of orders) {
+        yield normalizeOrderEvent(raw);
+      }
+    }
+  }
+
+  async *subscribeAlerts(
+    _alertTypes?: string[],
+  ): AsyncIterable<ParsedPayloadResponse> {
+    return yield {
+      body: {},
+      service: "alerts/subscribe",
     };
   }
 

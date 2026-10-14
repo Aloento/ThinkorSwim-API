@@ -51,6 +51,9 @@ export default class WsJsonServerProxy implements Disposable {
       case "optionQuotes":
       case "workingOrders":
       case "marketDepth":
+      case "subscribeAlerts":
+      case "orderEvents":
+      case "observeOrders":
       case "subscribeMessageCenter":
       case "subscribeStudies":
       case "subscribeNews":

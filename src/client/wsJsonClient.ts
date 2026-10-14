@@ -36,6 +36,10 @@ import { NewsHeadersGetRelevantRequestParams } from "./services/newsHeadersGetRe
 import { NewsHeadersSubscribeRequestParams } from "./services/newsHeadersSubscribeMessageHandler.js";
 import { OptionChainDetailsRequest } from "./services/optionChainDetailsMessageHandler.js";
 import { OptionQuotesRequestParams } from "./services/optionQuotesMessageHandler.js";
+import {
+  NormalizedOrderEvent,
+  OrderEventsRequestParams,
+} from "./services/orderEventsMessageHandler.js";
 import { PlaceLimitOrderRequestParams } from "./services/placeOrderMessageHandler.js";
 import { QuotesGetRequestParams } from "./services/quotesGetMessageHandler.js";
 import { ScanFilterGetRequestParams } from "./services/scanFilterGetMessageHandler.js";
@@ -99,6 +103,20 @@ export interface WsJsonClient extends Disposable {
   searchInstruments(query: string): Promise<ParsedPayloadResponse>;
 
   lookupAlerts(): AsyncIterable<ParsedPayloadResponse>;
+
+  /**
+   * alerts/subscribe：告警事件流（task-14B）。alertTypes 缺省
+   * DEFAULT_ALERT_TYPES（CHANGED/TRIGGERED/EXPIRED/MULTIPLE_EXPIRED）。
+   */
+  subscribeAlerts(alertTypes?: string[]): AsyncIterable<ParsedPayloadResponse>;
+
+  /** order_events 原始事件流（task-14A）：body.orders[] 为 wire 原样 */
+  orderEvents(
+    request: OrderEventsRequestParams,
+  ): AsyncIterable<ParsedPayloadResponse>;
+
+  /** 归一化订单事件流（task-14A）：orders[] 逐条展平 + status 归一 */
+  observeOrders(account: string): AsyncIterable<NormalizedOrderEvent>;
 
   optionChain(symbol: string): Promise<ParsedPayloadResponse>;
 

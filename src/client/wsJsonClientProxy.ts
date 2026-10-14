@@ -44,6 +44,10 @@ import { NewsHeadersGetRelevantRequestParams } from "./services/newsHeadersGetRe
 import { NewsHeadersSubscribeRequestParams } from "./services/newsHeadersSubscribeMessageHandler.js";
 import { OptionChainDetailsRequest } from "./services/optionChainDetailsMessageHandler.js";
 import { OptionQuotesRequestParams } from "./services/optionQuotesMessageHandler.js";
+import {
+  NormalizedOrderEvent,
+  OrderEventsRequestParams,
+} from "./services/orderEventsMessageHandler.js";
 import { PlaceLimitOrderRequestParams } from "./services/placeOrderMessageHandler.js";
 import { QuotesGetRequestParams } from "./services/quotesGetMessageHandler.js";
 import { ScanFilterGetRequestParams } from "./services/scanFilterGetMessageHandler.js";
@@ -158,6 +162,10 @@ export const ALL_REQUESTS = [
   "getSupportChats",
   "setUserProperties",
   "acceptDisclosures",
+  // ---- 第六批（task-14）----
+  "subscribeAlerts",
+  "orderEvents",
+  "observeOrders",
 ] as const;
 type RequestType = typeof ALL_REQUESTS;
 export type Request = RequestType[number];
@@ -854,6 +862,32 @@ export class WsJsonClientProxy implements WsJsonClient {
     return this.dispatch<ParsedPayloadResponse>(
       "workingOrders",
       accountNumber,
+    ).iterable();
+  }
+
+  /** task-14B：alerts/subscribe 流（args 为 alertTypes 数组或 undefined） */
+  subscribeAlerts(alertTypes?: string[]): AsyncIterable<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "subscribeAlerts",
+      alertTypes,
+    ).iterable();
+  }
+
+  /** task-14A：order_events 原始流（args 单对象 {account, types?}） */
+  orderEvents(
+    request: OrderEventsRequestParams,
+  ): AsyncIterable<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "orderEvents",
+      request,
+    ).iterable();
+  }
+
+  /** task-14A：归一化事件流。载荷为纯 JSON（无 Date），跨 wire 无需 dateReviver */
+  observeOrders(account: string): AsyncIterable<NormalizedOrderEvent> {
+    return this.dispatch<NormalizedOrderEvent>(
+      "observeOrders",
+      account,
     ).iterable();
   }
 
