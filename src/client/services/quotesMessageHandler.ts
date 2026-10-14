@@ -43,9 +43,9 @@ export default class QuotesMessageHandler implements WebSocketApiMessageHandler<
   buildRequest(symbols: string[]): RawPayloadRequest {
     return newPayload({
       header: { service: "quotes", id: "generalQuotes", ver: 0 },
-      // P7（agent/03）：不再硬编码 account:"COMBINED ACCOUNT"——2026-10-13
+      // P7（docs/TECHNICAL.md）：不再硬编码 account:"COMBINED ACCOUNT"——2026-10-13
       // 实测省略 account 参数服务器同样返回全账户行情
-      // （agent/tools/exp-quotes-noaccount.mjs：items=1 MARK=340.53）。
+      // （scripts/exp-quotes-noaccount.mjs：items=1 MARK=340.53）。
       params: {
         symbols,
         refreshRate: 300,

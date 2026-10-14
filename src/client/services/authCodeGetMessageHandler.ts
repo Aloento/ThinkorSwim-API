@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 必填校验抄自 agent/artifacts/probe-2026-10-13/auth_code_get.jsonl：
+// 必填校验抄自 本地录制（scripts/probe-services.mjs 可复现）：
 // "$.params.issuedTo: must not be blank; $.params.refreshToken: must not
 // be blank; $.params.appliesTo: must not be blank"。guest 无 refreshToken，
 // 成功帧未实测。

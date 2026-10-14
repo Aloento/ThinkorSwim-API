@@ -5,7 +5,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 实测自 agent/artifacts/write-2026-10-13/W5.jsonl：
+// 实测自 本地录制（scripts/probe-services.mjs 可复现）：
 // 请求可用参数集合为 [watchlistName, symbols]（params.name / params.watchlistId
 // 均报 error，见 W5.jsonl 第 1 帧、W5d.jsonl 第 1 帧——即 create 不支持 upsert）。
 // 更正（第三轮实测 W5f.jsonl）：create 之后增删/重排成分走

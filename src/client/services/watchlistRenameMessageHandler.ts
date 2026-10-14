@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 实测自 agent/artifacts/write-2026-10-13/W5b.jsonl 第 2 帧。
+// 实测自 本地录制（scripts/probe-services.mjs 可复现） 第 2 帧。
 export type WatchlistRenameRequestParams = {
   watchlistId: number;
   watchlistName: string;

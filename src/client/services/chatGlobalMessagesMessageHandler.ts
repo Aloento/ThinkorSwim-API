@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 实测自 agent/artifacts/probe-2026-10-13/chat_global_messages.jsonl（type: snapshot）。
+// 实测自 本地录制（scripts/probe-services.mjs 可复现）（type: snapshot）。
 export type ChatGlobalMessageHours = {
   open: boolean;
   fromTime: string;

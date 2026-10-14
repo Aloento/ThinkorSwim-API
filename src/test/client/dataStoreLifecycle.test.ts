@@ -16,7 +16,7 @@ import {
 } from "../../client/tdaWsJsonTypes";
 
 /**
- * 任务11（P4，agent/03）：dataStore 生命周期清理 + iterable 提前退出联动。
+ * 任务11（P4，docs/TECHNICAL.md）：dataStore 生命周期清理 + iterable 提前退出联动。
  * - handler 级：removeStore（按 service$id 前缀删全部 ver）/ clearStores /
  *   storeSize 测试钩子的直接单测；
  * - 客户端级：for-await break / 循环体异常触发 SubscriptionStream 的

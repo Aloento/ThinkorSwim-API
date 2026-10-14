@@ -5,7 +5,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 订单类型（网页版下单面板全集；guest 实测覆盖见 agent/06 §3 第六轮）。
+// 订单类型（网页版下单面板全集；guest 实测覆盖见 docs/TECHNICAL.md §3 第六轮）。
 // 服务端错误帧自曝可用值的教训（chart handler 注释）：只发该类型必要的键。
 //
 // ⚠️ 实测（write-2026-10-14/W9b.jsonl）：wire 上 orderType 枚举为

@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 真实账户实测修通（2026-10-14，agent/tools/exp-tc.mjs）：只发 {account}
+// 真实账户实测修通（2026-10-14，scripts/exp-tc.mjs）：只发 {account}
 // 报 "Unexpected error during validation"；按 bundle 调用点
 // （GET_TRANSACTIONS_CATEGORIES：{startTime,endTime,account,
 //   transactionCategories,cryptoTransactionTypes,cashFutureTransactionTypes}）

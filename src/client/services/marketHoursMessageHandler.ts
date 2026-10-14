@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 请求参数实测自 agent/artifacts/probe-2026-10-13/market_hours.jsonl：
+// 请求参数实测自 本地录制（scripts/probe-services.mjs 可复现）：
 // 发送 params.exchanges 时服务端报错，可用参数集合为 [date, markets]。
 export type MarketHoursRequestParams = {
   markets: string[];

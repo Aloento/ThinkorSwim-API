@@ -4,12 +4,12 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 实测自 agent/artifacts/write-2026-10-13/W5e.jsonl 第 5 帧：删除成功时 body 为空对象。
+// 实测自 本地录制（scripts/probe-services.mjs 可复现） 第 5 帧：删除成功时 body 为空对象。
 export type RawPayloadResponseWatchlistDelete = Record<string, unknown>;
 
 // 删除 watchlist。
 // 注：成分修改服务是 watchlist/add、watchlist/remove、watchlist/rearrange
-// （agent/06 第 4 节 bundle 挖掘第二轮实测确认，params {watchlistId, symbols}，
+// （docs/TECHNICAL.md 第 4 节 bundle 挖掘第二轮实测确认，params {watchlistId, symbols}，
 // 实测帧 write-2026-10-13/W5f.jsonl；handler 见 watchlistAdd / watchlistRemove /
 // watchlistRearrange MessageHandler）；早期 7 个猜测名（add_symbols 等，
 // 见 W5b/W5c/W5e.jsonl）均为 "Undefined service"。

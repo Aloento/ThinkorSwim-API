@@ -17,7 +17,7 @@ import { AuthError } from "../../client/tdaWsJsonTypes";
  * socketFactory 模式（jest-websocket-mock 接管全局 WebSocket）。
  *
  * guest 局限：guest 会话无 refreshToken，端到端续期不可验证——直通分支
- * （warn 一次）在单测覆盖，真实账户回归项已标注 agent/05 与 README。
+ * （warn 一次）在单测覆盖，真实账户回归项已标注 docs/TECHNICAL.md 与 README。
  */
 
 const clientId = "TOSWeb";

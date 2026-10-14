@@ -61,7 +61,7 @@ import { UnsubscribeRequestParams } from "./services/unsubscribeMessageHandler.j
 import { WatchlistCategoriesRequestParams } from "./services/watchlistCategoriesMessageHandler.js";
 import { WatchlistCreateRequestParams } from "./services/watchlistCreateMessageHandler.js";
 import { WatchlistRenameRequestParams } from "./services/watchlistRenameMessageHandler.js";
-// ---- 第五批参数类型（task-13，agent/07 §第五批接入契约）----
+// ---- 第五批参数类型（task-13，docs/TECHNICAL.md §第五批接入契约）----
 import { DisclosuresAcceptRequestParams } from "./services/disclosuresAcceptMessageHandler.js";
 import { FundamentalsCurrentRequestParams } from "./services/fundamentalsCurrentMessageHandler.js";
 import { NewsHeadersGetRequestParams } from "./services/newsHeadersGetMessageHandler.js";
@@ -79,7 +79,7 @@ const logger = debug("wsClientProxy");
 export const ALL_REQUESTS = [
   "authenticateWithAuthCode",
   "authenticateWithAccessToken",
-  // A6（agent/03）：optionChainQuotes 曾在 68/78 行重复出现两次，去重
+  // A6（docs/TECHNICAL.md）：optionChainQuotes 曾在 68/78 行重复出现两次，去重
   "disconnect",
   "reconnect",
   "quotes",

@@ -1,8 +1,8 @@
 /**
  * 交易安全闸门（task-14D，阶段 3"guard 进库"）。
  *
- * 背景：此前 paper-only 闸门只存在于 agent/tools/probe-write.mjs 工具层
- * （agent/05 阶段 3 遗留项）。本模块把它移入库内：RealWsJsonClientOptions
+ * 背景：此前 paper-only 闸门只存在于 scripts/probe-write.mjs 工具层
+ * （docs/TECHNICAL.md 阶段 3 遗留项）。本模块把它移入库内：RealWsJsonClientOptions
  * .guard 配置，confirmOrder/submitOrder/replaceOrder/cancelOrder 四个写
  * 入口前置校验，任一规则不通过抛 GuardError——**默认 undefined = 不启用**，
  * 对既有调用方零行为变化。

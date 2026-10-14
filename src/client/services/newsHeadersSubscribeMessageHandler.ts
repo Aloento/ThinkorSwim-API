@@ -5,7 +5,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 参数实测自前端 bundle（agent/artifacts/frontend-index.js）调用点：
+// 参数实测自前端 bundle（本地录制（scripts/probe-services.mjs 可复现））调用点：
 //   {header:{service:"news_headers/subscribe",id:r,ver:0},params:{symbol:t}}
 // 响应处理与 news_headers/get 共用（bundle 中同一回调消费 news[]）。
 export type NewsHeadersSubscribeRequestParams = {
@@ -19,7 +19,7 @@ export type RawPayloadResponseNewsSubscribe = {
   news: NewsHeaderItem[];
 };
 
-// 新闻标题订阅（推送流）。bundle 确认存在（agent/06 第 4 节）；wsjson 线上
+// 新闻标题订阅（推送流）。bundle 确认存在（docs/TECHNICAL.md 第 4 节）；wsjson 线上
 // 帧未实测——bundle 里前端其实是用 news_headers/get 轮询模拟的
 // （requestId 把 subscribe 替换成 get），故本 handler 的参数/响应按 bundle
 // 调用点写，标注未实测。

@@ -4,14 +4,14 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 枚举抄自 agent/artifacts/probe-2026-10-13/study_subscribe.jsonl 错误帧：
+// 枚举抄自 本地录制（scripts/probe-services.mjs 可复现） 错误帧：
 // "Mismatched request parameter name is \"params.type\". Possible enum
 // values are [STUDY, PUBLIC, CUSTOM]"。
 const STUDY_TYPES = ["STUDY", "PUBLIC", "CUSTOM"] as const;
 
 export type StudySubscribeType = (typeof STUDY_TYPES)[number];
 
-// task-17（agent/artifacts/exp-t17/exp-t17-round2.jsonl）实测：studies 元素
+// task-17（本地录制（scripts/probe-services.mjs 可复现））实测：studies 元素
 // 缺 aggregationPeriod 报 "$.params.studies[0].aggregationPeriod: must not be
 // null"；非法值错误帧自曝枚举全量 24 项：
 // [MIN1, MIN2, MIN3, MIN4, MIN5, MIN10, MIN15, MIN20, MIN30, HOUR1, HOUR2,

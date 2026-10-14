@@ -6,7 +6,7 @@ import WebSocketApiMessageHandler, {
 } from "./webSocketApiMessageHandler.js";
 
 // 画线读服务（drawing 写套的配套）。参数逐字抄自前端 bundle
-// （agent/artifacts/frontend-index.js）调用点：
+// （本地录制（scripts/probe-services.mjs 可复现））调用点：
 //   drawing_sets  id:`drawing_sets-<n>`  params:{symbol}
 //   drawings      id:`drawings_<guid>`   params:{guid}
 //                 响应 drawings[]（bundle 里逐条按 o.type 分支处理，

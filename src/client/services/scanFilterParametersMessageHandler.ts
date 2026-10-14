@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 可用参数集合抄自 agent/artifacts/probe-2026-10-13/
+// 可用参数集合抄自 本地录制（scripts/probe-services.mjs 可复现）
 // scan_filter_parameters.jsonl 错误帧：
 // "Mismatched request parameter name is \"params.filter\". Available
 // parameters are [getPatternParameters, fundamentals, studies]"
@@ -18,7 +18,7 @@ export type ScanFilterParametersRequestParams = {
   getPatternParameters?: boolean;
 };
 
-// guest 对合法参数返回空响应（agent/06 第五轮），响应体形状待真实账户补全；
+// guest 对合法参数返回空响应（docs/TECHNICAL.md 第五轮），响应体形状待真实账户补全；
 // 预期为各筛选器的参数定义（screener 查询的构造材料）。
 export type RawPayloadResponseScanFilterParameters = {
   [key: string]: unknown;

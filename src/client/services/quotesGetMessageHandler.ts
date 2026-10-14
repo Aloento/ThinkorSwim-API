@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 枚举抄自 agent/artifacts/probe-2026-10-13/quotes_get.jsonl 错误帧：
+// 枚举抄自 本地录制（scripts/probe-services.mjs 可复现） 错误帧：
 // "Possible enum values are [ASK, ASK_EXCHANGE, ASK_SIZE, BID,
 // BID_EXCHANGE, BID_SIZE, LAST, LAST_ETH, LAST_RTH, LAST_EXCHANGE,
 // LAST_SIZE, VOLUME]"——一次性报价可用字段（无流式 MARK 等，06 第三轮）。

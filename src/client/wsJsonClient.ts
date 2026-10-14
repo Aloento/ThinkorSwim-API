@@ -56,7 +56,7 @@ import { UnsubscribeRequestParams } from "./services/unsubscribeMessageHandler.j
 import { WatchlistCategoriesRequestParams } from "./services/watchlistCategoriesMessageHandler.js";
 import { WatchlistCreateRequestParams } from "./services/watchlistCreateMessageHandler.js";
 import { WatchlistRenameRequestParams } from "./services/watchlistRenameMessageHandler.js";
-// ---- 第五批参数类型（task-13，agent/07 §第五批接入契约）----
+// ---- 第五批参数类型（task-13，docs/TECHNICAL.md §第五批接入契约）----
 import { DisclosuresAcceptRequestParams } from "./services/disclosuresAcceptMessageHandler.js";
 import { FundamentalsCurrentRequestParams } from "./services/fundamentalsCurrentMessageHandler.js";
 import { NewsHeadersGetRequestParams } from "./services/newsHeadersGetMessageHandler.js";
@@ -75,7 +75,7 @@ export interface WsJsonClient extends Disposable {
 
   authenticateWithAccessToken(args: {
     accessToken: string;
-    /** refreshToken 可选：guest 路径没有 refresh token（agent/07） */
+    /** refreshToken 可选：guest 路径没有 refresh token（docs/TECHNICAL.md） */
     refreshToken?: string;
   }): Promise<RawLoginResponseBody | null>;
 
@@ -95,7 +95,7 @@ export interface WsJsonClient extends Disposable {
 
   accountPositions(accountNumber: string): AsyncIterable<ParsedPayloadResponse>;
 
-  /** accountPositions 的语义别名（agent/07：门面统一 get* 命名） */
+  /** accountPositions 的语义别名（docs/TECHNICAL.md：门面统一 get* 命名） */
   getPositions(accountNumber: string): AsyncIterable<ParsedPayloadResponse>;
 
   chart(request: ChartRequestParams): AsyncIterable<ParsedPayloadResponse>;
@@ -172,7 +172,7 @@ export interface WsJsonClient extends Disposable {
 
   watchlist(watchlistId: number): Promise<ParsedPayloadResponse>;
 
-  // ---- 账户域（agent/07，probe-2026-10-13 实测背书）----
+  // ---- 账户域（docs/TECHNICAL.md，probe-2026-10-13 实测背书）----
 
   getAccounts(): Promise<ParsedPayloadResponse>;
 
@@ -226,7 +226,7 @@ export interface WsJsonClient extends Disposable {
     symbols: string[],
   ): Promise<ParsedPayloadResponse>;
 
-  // ---- 第四批（agent/07 §"第四批接入契约"，task-8 handler 全量接入）----
+  // ---- 第四批（docs/TECHNICAL.md §"第四批接入契约"，task-8 handler 全量接入）----
   // 一次性 Promise 型走 dispatchOneShot（task-6 语义：断线 reject 不重放）。
 
   /** study/categories：研究指标目录（26 分类/441 研究，实测成功帧） */
@@ -368,7 +368,7 @@ export interface WsJsonClient extends Disposable {
    */
   logoff(request: LogoffSchwabRequestParams): Promise<ParsedPayloadResponse>;
 
-  // ---- 第五批（agent/07 §"第五批接入契约"，task-5/2 批次 11 个 handler 收尾）----
+  // ---- 第五批（docs/TECHNICAL.md §"第五批接入契约"，task-5/2 批次 11 个 handler 收尾）----
 
   /** news_headers/get：新闻标题 snapshot（实测参数 [symbol, limit?]） */
   getNews(request: NewsHeadersGetRequestParams): Promise<ParsedPayloadResponse>;

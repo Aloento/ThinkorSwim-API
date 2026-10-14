@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 实测自 agent/artifacts/probe-2026-10-13/margin_calls.jsonl（type: snapshot）。
+// 实测自 本地录制（scripts/probe-services.mjs 可复现）（type: snapshot）。
 // 实测时 marginCalls 均为空数组，元素结构未观测到，故为 unknown[]。
 export type RawMarginAccountsDataItem = {
   account: string;

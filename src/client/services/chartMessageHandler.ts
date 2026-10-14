@@ -18,7 +18,7 @@ export type RawPayloadResponseChart = {
   symbol: string;
 };
 
-// 服务端可用参数集合（实测自 agent/artifacts/probe-2026-10-13/chart.jsonl 错误帧）：
+// 服务端可用参数集合（实测自 本地录制（scripts/probe-services.mjs 可复现） 错误帧）：
 // [priceType, timeAggregation, extendedHours, studies, symbol,
 //  startAtMarketOpen, range, cryptoMidnightUtc, tickAggregation, refreshRate]
 // 发送未知参数名会导致整条请求报 error。
@@ -33,7 +33,7 @@ export type ChartRequestParams = {
   startAtMarketOpen?: boolean;
   cryptoMidnightUtc?: boolean;
   refreshRate?: number;
-  /** P7（agent/03）：订阅 id，默认 "chart-page-chart-1"。并发订阅多标的
+  /** P7（docs/TECHNICAL.md）：订阅 id，默认 "chart-page-chart-1"。并发订阅多标的
    *  时应传不同 id，否则按 id 路由的响应会合并到同一订阅（task-1 语义）。 */
   id?: string;
 };

@@ -4,8 +4,8 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 实测自 agent/artifacts/probe-2026-10-13/watchlist_categories.jsonl 与
-// agent/artifacts/write-2026-10-13/W5.jsonl / W5e.jsonl。
+// 实测自 本地录制（scripts/probe-services.mjs 可复现） 与
+// 本地录制（scripts/probe-services.mjs 可复现） / W5e.jsonl。
 export type WatchlistSummaryItem = {
   id: number;
   name: string;

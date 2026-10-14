@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 枚举抄自 agent/artifacts/probe-2026-10-13/news_headers_get_relevant.jsonl
+// 枚举抄自 本地录制（scripts/probe-services.mjs 可复现）
 // 错误帧："Possible enum values are [BY_RELEVANCE, BY_TIME]"。
 const SORT_MODES = ["BY_RELEVANCE", "BY_TIME"] as const;
 

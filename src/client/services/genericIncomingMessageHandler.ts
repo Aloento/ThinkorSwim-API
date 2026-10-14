@@ -95,7 +95,7 @@ export default class GenericIncomingMessageHandler {
   }
 
   /**
-   * P4（agent/03）：删除 dataStore 中某 service+id 的全部补丁基底条目
+   * P4（docs/TECHNICAL.md）：删除 dataStore 中某 service+id 的全部补丁基底条目
    * （所有 ver）。dataStore 按 `service_id_ver` 只进不出，长连接下（尤其
    * quotes/chart 高频 patch）会无限增长——客户端在订阅生命周期结束
    * （iterable 消费者提前退出 / disconnect）时调用本方法回收。

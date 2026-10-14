@@ -5,7 +5,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// bundle 调用点（agent/artifacts/frontend-index.js，逐字核对）：
+// bundle 调用点（本地录制（scripts/probe-services.mjs 可复现），逐字核对）：
 //   news_headers/subscribe_relevant  params:{symbols}   （无 sortMode）
 //   news_body                        params:{newsCode}
 //                                    响应 {newsCode, text}

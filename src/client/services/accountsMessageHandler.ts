@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 响应字段实测自 agent/artifacts/probe-2026-10-13/accounts.jsonl（type: snapshot）
+// 响应字段实测自 本地录制（scripts/probe-services.mjs 可复现）（type: snapshot）
 export type RawAccountsItem = {
   code: string;
   description?: string;

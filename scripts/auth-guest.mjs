@@ -221,12 +221,10 @@ async function main() {
     const redacted = JSON.parse(JSON.stringify(body));
     for (const k of ["token", "refreshToken"]) {
       const v = redacted.body?.[k];
-      if (typeof v === "string")
-        redacted.body[k] = `<len ${v.length}>`;
+      if (typeof v === "string") redacted.body[k] = `<len ${v.length}>`;
     }
     if (typeof redacted.body?.accessTokenInfo?.refreshToken === "string")
-      redacted.body.accessTokenInfo.refreshToken =
-        `<len ${redacted.body.accessTokenInfo.refreshToken.length}>`;
+      redacted.body.accessTokenInfo.refreshToken = `<len ${redacted.body.accessTokenInfo.refreshToken.length}>`;
     writeFileSync(
       join(artDir, "login-raw.json"),
       JSON.stringify(redacted, null, 2),

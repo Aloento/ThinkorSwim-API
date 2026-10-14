@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 枚举值全量抄自 agent/artifacts/probe-2026-10-13/order_history.jsonl
+// 枚举值全量抄自 本地录制（scripts/probe-services.mjs 可复现）
 // 第 3 帧服务端错误帧："Possible enum values are [...]"。
 // 发送集合外的值会导致整条请求报 error。
 const ORDER_ENTRY_FIELDS = [

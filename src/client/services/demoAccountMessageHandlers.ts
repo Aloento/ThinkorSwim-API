@@ -9,7 +9,7 @@ import WebSocketApiMessageHandler, {
 //    set_balance   "$.params.accountCode: must not be null"
 //    adjust_cash   "$.params.accountCode: must not be null;
 //                   $.params.cashAmount: must not be null"
-// 2) bundle 调用点（agent/artifacts/frontend-index.js，逐字核对）：
+// 2) bundle 调用点（本地录制（scripts/probe-services.mjs 可复现），逐字核对）：
 //    set_balance  id:"set_balance"  params:{accountCode, newBalance, resetAccount:true}
 //    adjust_cash  id:"adjust_cash"  params:{accountCode, cashAmount, description:`Transfer ${cashAmount} dollars`}
 // 响应按 bundle 判定逻辑只关心 type!=="error"（无业务字段），成功帧 guest

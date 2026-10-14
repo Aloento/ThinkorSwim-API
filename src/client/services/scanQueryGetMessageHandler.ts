@@ -4,9 +4,9 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 必填校验抄自 agent/artifacts/probe-2026-10-13/scan_query_get.jsonl：
+// 必填校验抄自 本地录制（scripts/probe-services.mjs 可复现）：
 // "$.params.watchlistId: must not be null"。guest 传 watchlistId=100 过
-// 校验但报 "Unexpected server error"（isTerminal，agent/06 第五轮：guest
+// 校验但报 "Unexpected server error"（isTerminal，docs/TECHNICAL.md 第五轮：guest
 // screener 不可用），成功帧待真实账户。
 // bundle 调用点：params:{watchlistId:t}，id 动态
 // （`scan_query/get-${随机}`）——screener 查询条件在 bundle 里随

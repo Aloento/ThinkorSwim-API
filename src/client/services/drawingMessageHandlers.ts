@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 图表画线服务全套（agent/06 第三轮：drawing/create、drawing/update、
+// 图表画线服务全套（docs/TECHNICAL.md 第三轮：drawing/create、drawing/update、
 // drawing/delete、drawing_set/create、drawing_set/delete）。
 //
 // 参数双证据：
@@ -13,7 +13,7 @@ import WebSocketApiMessageHandler, {
 //                        $.params.drawing: must not be null"
 //    drawing_set/create "$.params.symbol: must not be blank;
 //                        $.params.name: must not be blank"
-// 2) bundle 调用点（agent/artifacts/frontend-index.js，逐字核对）：
+// 2) bundle 调用点（本地录制（scripts/probe-services.mjs 可复现），逐字核对）：
 //    drawing/create  params:{drawingSetGuid, drawing}   id:"drawing/create"
 //    drawing/update  params:{drawingSetGuid, drawingGuid, drawing}
 //                                                     id:"drawing/update"

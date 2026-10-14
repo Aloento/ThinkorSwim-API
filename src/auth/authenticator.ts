@@ -1,19 +1,19 @@
-// Authenticator：token 自动续期抽象（R1，agent/05 阶段 1）。
+// Authenticator：token 自动续期抽象（R1，docs/TECHNICAL.md 阶段 1）。
 //
-// 背景：wsjson login/schwab 响应携带 accessTokenInfo.refreshToken（agent/06
+// 背景：wsjson login/schwab 响应携带 accessTokenInfo.refreshToken（docs/TECHNICAL.md
 // F4），续期通道 access_token/get（refreshToken 换 accessToken）handler 已
 // 落地。实测口径：accessToken 约 24h 有效——在 23h 阈值前主动刷新，长连接
 // 会话即可跨天存活。
 //
-// guest 局限（agent/06）：guest 会话无 refreshToken，getValidToken() 走直通
+// guest 局限（docs/TECHNICAL.md）：guest 会话无 refreshToken，getValidToken() 走直通
 // 分支（console.warn 一次，不刷新）——**端到端续期回归需真实账户**（已在
-// agent/05 与 README 标注）。
+// docs/TECHNICAL.md 与 README 标注）。
 //
 // 注意：不引用任何 REST 续期通道——grant_type=refresh_token 的 REST 路径未
 // 实测（src/auth/refresh.mjs 不存在），按 YAGNI 不做；wsjson 的
 // access_token/get 通道已足够。
 //
-// 真实账户端到端实测（2026-10-14，agent/tools/exp-auth-refresh.mjs）：
+// 真实账户端到端实测（2026-10-14，scripts/exp-auth-refresh.mjs）：
 // - refreshToken 只在 F2A 勾选"信任设备"时签发（login/schwab 帧
 //   accessTokenInfo.refreshToken，len≈248~268）。
 // - 续期成功：{accessExpiresIn:86400, accessToken, refreshToken}，且
@@ -28,11 +28,11 @@ import { AuthError, ParsedPayloadResponse } from "../client/tdaWsJsonTypes.js";
 import { RawPayloadResponseAccessTokenGet } from "../client/services/accessTokenGetMessageHandler.js";
 import type { WsJsonClient } from "../client/wsJsonClient.js";
 
-/** accessToken 有效期约 24h，提前 1h 视为到期（实测口径，agent/06）。 */
+/** accessToken 有效期约 24h，提前 1h 视为到期（实测口径，docs/TECHNICAL.md）。 */
 export const DEFAULT_TOKEN_TTL_MS = 23 * 60 * 60 * 1000;
 
 /**
- * 真实账户实测（2026-10-14，agent/tools/exp-token-scope.mjs）：
+ * 真实账户实测（2026-10-14，scripts/exp-token-scope.mjs）：
  * access_token/get 的 scope 合法值为 "api"；"GENERAL"（guest OAuth REST
  * 侧常用值）被服务端拒 "NOT_AUTHORIZED: Unrecognized scope"。
  */

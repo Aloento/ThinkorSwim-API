@@ -44,7 +44,7 @@ export type ApiService =
   | "user_properties/set"
   | "disclosures/accept"
   | "transactions/categories"
-  // 第四批（task-8，agent/06 §4 第二/三/五轮 + 前端 bundle 调用点核对）：
+  // 第四批（task-8，docs/TECHNICAL.md §4 第二/三/五轮 + 前端 bundle 调用点核对）：
   | "news_headers/get_relevant"
   | "news_headers/subscribe"
   | "news_headers/subscribe_relevant"
@@ -78,5 +78,5 @@ export type ApiService =
   | "support_chat/messages"
   // bundle 枚举里存在但无 handler（前端用别的服务名达成，或已证伪）：
   //   quotes/options/centered —— 实测 "Undefined service"
-  //   （agent/artifacts/probe-2026-10-13/quotes_options_centered.jsonl）
+  //   （本地录制（scripts/probe-services.mjs 可复现））
   | "fake"; // testing only

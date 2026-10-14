@@ -214,10 +214,7 @@ const firstFrame = async (iterable, ms) => {
   return result;
 };
 
-const oe = await firstFrame(
-  client.orderEvents({ account: ACCOUNT }),
-  6000,
-);
+const oe = await firstFrame(client.orderEvents({ account: ACCOUNT }), 6000);
 console.log(
   "[smoke] order_events:",
   oe === "timeout"

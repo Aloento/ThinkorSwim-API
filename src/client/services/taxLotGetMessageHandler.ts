@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 枚举值全量抄自 agent/artifacts/probe-2026-10-13/tax_lot_get.jsonl
+// 枚举值全量抄自 本地录制（scripts/probe-services.mjs 可复现）
 // 第 2 帧服务端错误帧："Possible enum values are [...]"。
 const TAX_LOT_FIELDS = [
   "SYMBOL",

@@ -4,7 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 实测自 agent/artifacts/probe-2026-10-13/disclosures.jsonl（type: snapshot）。
+// 实测自 本地录制（scripts/probe-services.mjs 可复现）（type: snapshot）。
 // 实测账号下 body 为空对象，字段形状未知，保留开放结构。
 export type RawPayloadResponseDisclosures = Record<string, unknown>;
 

@@ -19,7 +19,7 @@ export type ReplaceOrderRequestParams = PlaceOrderRequestParams & {
 
 // 提交订单草稿（新单）或修改已存在的订单（带 refOrderId）。
 //
-// 实测（agent/tools/probe-write.mjs W2/W3 用例，agent/06 第 3 节）：
+// 实测（scripts/probe-write.mjs W2/W3 用例，docs/TECHNICAL.md 第 3 节）：
 // - 新单（W2）：action=SUBMIT ver=0，header 必须复用 CONFIRM 的草稿 id
 //   （update-draft-order-<SYMBOL>）；换 id 报
 //   "Can not submit while prices are not available!"。

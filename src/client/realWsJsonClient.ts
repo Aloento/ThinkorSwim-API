@@ -14,7 +14,7 @@ import {
 } from "./messageTypeHelpers.js";
 import ResponseParser from "./responseParser.js";
 import SubscriptionStream from "./subscriptionStream.js";
-// ---- 第四批 handler 与其参数类型（task-8，agent/07 §第四批接入契约）----
+// ---- 第四批 handler 与其参数类型（task-8，docs/TECHNICAL.md §第四批接入契约）----
 import AccessTokenGetMessageHandler, {
   AccessTokenGetRequestParams,
 } from "./services/accessTokenGetMessageHandler.js";
@@ -163,7 +163,7 @@ import WatchlistRenameMessageHandler, {
 import WatchlistRearrangeMessageHandler from "./services/watchlistRearrangeMessageHandler.js";
 import WebSocketApiMessageHandler from "./services/webSocketApiMessageHandler.js";
 import WorkingOrdersMessageHandler from "./services/workingOrdersMessageHandler.js";
-// ---- 第五批 handler 与其参数类型（task-13，agent/07 §第五批接入契约）----
+// ---- 第五批 handler 与其参数类型（task-13，docs/TECHNICAL.md §第五批接入契约）----
 import ChatGlobalMessagesMessageHandler from "./services/chatGlobalMessagesMessageHandler.js";
 import DisclosuresAcceptMessageHandler, {
   DisclosuresAcceptRequestParams,
@@ -908,7 +908,7 @@ export class RealWsJsonClient implements WsJsonClient {
     this.bufferEnded = true;
     // This ensures that listeners will resolve the promise cleanly from any `for await` loops
     this.buffer.end();
-    // P4（agent/03）：整个会话终结、所有流消费者随之退出——全量回收
+    // P4（docs/TECHNICAL.md）：整个会话终结、所有流消费者随之退出——全量回收
     // dataStore 补丁基底。重连恢复路径不走这里（消费者还活着，基底要留给
     // 重放后的增量 patch）。
     this.responseParser.clearStores();
@@ -970,7 +970,7 @@ export class RealWsJsonClient implements WsJsonClient {
    * alerts/subscribe 告警事件流（task-14B，03 A4 复开口）：handler 早已
    * 存在但只注册未派发（audit-coverage v2 证伪了"已接入"的记载）。
    * alertTypes 缺省 DEFAULT_ALERT_TYPES（CHANGED/TRIGGERED/EXPIRED/
-   * MULTIPLE_EXPIRED），实测帧见 agent/artifacts/watch2-console.txt。
+   * MULTIPLE_EXPIRED），实测帧见 本地录制（scripts/probe-services.mjs 可复现）。
    */
   subscribeAlerts(
     alertTypes: string[] = DEFAULT_ALERT_TYPES,
@@ -1075,7 +1075,7 @@ export class RealWsJsonClient implements WsJsonClient {
     return this.dispatchOneShot(GetWatchlistMessageHandler, watchlistId);
   }
 
-  // ---- 账户域（agent/07，probe-2026-10-13 实测背书）----
+  // ---- 账户域（docs/TECHNICAL.md，probe-2026-10-13 实测背书）----
   // Promise 型门面统一取首个 snapshot；error 帧经 dispatch 自动 reject。
 
   getAccounts(): Promise<ParsedPayloadResponse> {
@@ -1251,7 +1251,7 @@ export class RealWsJsonClient implements WsJsonClient {
     return this.dispatchOneShot(UserPropertiesMessageHandler, null as never);
   }
 
-  // ---- 第四批门面（agent/07 §第四批接入契约）----
+  // ---- 第四批门面（docs/TECHNICAL.md §第四批接入契约）----
   // Promise 型走 dispatchOneShot（断线 reject 不重放）；推送流走 dispatchHandler
   // （注册进 activeRequests，重连后原样重放）。
 
@@ -1448,7 +1448,7 @@ export class RealWsJsonClient implements WsJsonClient {
     return this.dispatchHandler(MarketDepthMessageHandler, symbol).iterable();
   }
 
-  // ---- 第五批门面（agent/07 §第五批接入契约，task-13）----
+  // ---- 第五批门面（docs/TECHNICAL.md §第五批接入契约，task-13）----
   // Promise 型走 dispatchOneShot；持续推送流走 dispatchHandler（重放语义
   // 同第四批）。options_statistics 为 snapshot+patch 流（06 §4 实测），
   // 按契约以 AsyncIterable 消费。
@@ -1503,7 +1503,7 @@ export class RealWsJsonClient implements WsJsonClient {
 
   /**
    * chat_global/messages：交易台 chat 全局公告/服务时间。
-   * 契约（agent/07 第五批）定为 AsyncIterable：首帧 snapshot，公告/开关
+   * 契约（docs/TECHNICAL.md 第五批）定为 AsyncIterable：首帧 snapshot，公告/开关
    * 变更由服务端推送更新（probe 观察窗内仅一帧 snapshot）。
    */
   subscribeGlobalChats(): AsyncIterable<ParsedPayloadResponse> {
@@ -1557,7 +1557,7 @@ export class RealWsJsonClient implements WsJsonClient {
       this.activeRequests.set(`${requestService}$${requestId}`, request);
     }
     const observable = this.responseObservable(requestService, requestId);
-    // P4（agent/03）：流式订阅的资源回收挂到消费者提前退出路径上——
+    // P4（docs/TECHNICAL.md）：流式订阅的资源回收挂到消费者提前退出路径上——
     // SubscriptionStream 的 return()/throw()（for-await 的 break / 抛异常）
     // 经 releaseSubscription 清 dataStore 基底、注销重放登记并 best-effort
     // 发 unsubscribe。服务端正常终止（buffer.end）不走这里，由 endBuffer
@@ -1656,7 +1656,7 @@ export class RealWsJsonClient implements WsJsonClient {
   }
 
   /**
-   * 流式订阅的资源回收（P4，agent/03）：消费者提前退出（for-await 的
+   * 流式订阅的资源回收（P4，docs/TECHNICAL.md）：消费者提前退出（for-await 的
    * break/throw 触发 SubscriptionStream.return()/throw()）时调用。
    * 1) 删 GenericIncomingMessageHandler.dataStore 里该订阅的补丁基底
    *    （否则长连接下 quotes/chart 等高频 patch 的基底永久驻留，内存只涨不降）；
@@ -1775,7 +1775,7 @@ export class RealWsJsonClient implements WsJsonClient {
     // 清空登记表，避免 reconnect() 向新会话重放无人认领的请求。
     this.activeRequests.clear();
     // P4：显式断开 = 服务端整个会话销毁，逐个发 unsubscribe 无意义；
-    // 直接清空本地 dataStore 的全部补丁基底（agent/03 内存增长项）。
+    // 直接清空本地 dataStore 的全部补丁基底（docs/TECHNICAL.md 内存增长项）。
     this.responseParser.clearStores();
     const socket = this.socket;
     this.socket = undefined;

@@ -77,8 +77,8 @@ export type OrderEventsSnapshotResponse = {
 
 /**
  * order_events 订阅参数。types 缺省取前端实测集合
- * （agent/artifacts/watch2-console.txt +23.73s 线上请求帧、
- * agent/tools/probe-services.mjs 同款）。
+ * （本地录制（scripts/probe-services.mjs 可复现） +23.73s 线上请求帧、
+ * scripts/probe-services.mjs 同款）。
  */
 export type OrderEventsRequestParams = {
   account: string;
@@ -95,13 +95,13 @@ export const DEFAULT_ORDER_EVENT_TYPES = [
 ];
 
 /**
- * 归一化订单状态。取值直接取网页版前端自带状态枚举（agent/artifacts/
+ * 归一化订单状态。取值直接取网页版前端自带状态枚举（本地录制目录/
  * frontend-index.js 的 mn 枚举：FILLED/REJECTED/CANCELED/WORKING/EXPIRED/
  * "WAIT TRG"/"WAIT STOP"/"WAIT COND"/"WAIT REV"/NONE），枚举成员改用
  * 下划线写法。
  *
  * ⚠️ 证据说明（task-14A"先提取真实值再定，别猜"）：任务书点名的
- * agent/artifacts/probe-2026-10-13/order_events.jsonl 是空 body snapshot
+ * 本地录制（scripts/probe-services.mjs 可复现） 是空 body snapshot
  * （guest 无订单），write-2026-10-13/W2.jsonl 是 place_order 帧——两者
  * 均不含 order_events 的 status 实测值。本映射表因此以前端 bundle 中
  * 官方归一化函数（cp，20 个 raw wire 值 → 10 个归一值）为准；

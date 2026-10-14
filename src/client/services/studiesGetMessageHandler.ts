@@ -7,7 +7,7 @@ import WebSocketApiMessageHandler, {
 export type StudiesGetRequestParams = {
   // 必须是非空的**真实研究名**（如 "SimpleMovingAvg"）。
   // 简写（"SMA"）实测报 error "No study with name: SMA,VOL"
-  // （agent/artifacts/probe-2026-10-13/studies_get.jsonl 第 2 帧）；
+  // （本地录制（scripts/probe-services.mjs 可复现） 第 2 帧）；
   // 空数组报 "$.params.studies: must not be empty"（第 1 帧）。
   studies: string[];
 };
