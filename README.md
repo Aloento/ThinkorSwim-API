@@ -54,26 +54,39 @@ node --env-file=.env dist/example/wsProxyServer.js
 
 # 支持的 API（全部经线上实测）
 
-| 域       | 能力                                                                                                                          |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| 认证     | access token / authCode；PAPER 与真实双端点；token 跨连接复用                                                                 |
-| 账户     | accounts · statement · positions · margin_calls · disclosures · user_properties                                               |
-| 行情     | quotes · quotes/get · chart（含 extendedHours/priceType/tick）· market_depth · market_hours                                   |
-| 期权     | optionSeries · optionSeries/quotes · option_chain/get · quotes/options · options_statistics                                   |
-| 基本面   | fundamentals/current · studies/get · study/categories（441 指标目录）                                                         |
-| 新闻     | news_headers/get（相关新闻/relevant 视权限）                                                                                  |
-| 搜索     | instrument_search                                                                                                             |
-| 交易     | **两步下单 CONFIRM→SUBMIT（同草稿 id，库内部处理）** · replaceOrder(EDIT_ORDER) · cancel_order · order_events · order_history |
-| 告警     | alerts/create · alerts/cancel · alerts/lookup · alerts/subscribe                                                              |
-| 自选列表 | watchlist get/categories/create/rename/delete/**add/remove/rearrange**                                                        |
-| 消息中心 | message_center/get · message_center/subscribe                                                                                 |
+| 域       | 能力                                                                                                                                              |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 认证     | access token / authCode；PAPER 与真实双端点；token 跨连接复用；`getAccessToken`（refreshToken 续期通道）· `auth_code/get`                         |
+| 账户     | accounts · statement · positions · margin_calls · disclosures(+/accept) · user_properties(+/set) · order_history · tax_lot(get/update)            |
+| 行情     | quotes · quotes/get · chart（含 extendedHours/priceType/tick，id 可配）· market_depth · market_hours                                              |
+| 期权     | optionSeries · optionSeries/quotes · option_chain/get · quotes/options · options_statistics                                                       |
+| 基本面   | fundamentals/current(+history) · studies/get · study/categories（441 指标目录）· study/subscribe                                                  |
+| 新闻     | news_headers/get · get_relevant · subscribe(_relevant) · news_body（relevant 视权限）                                                             |
+| 筛选器   | scan_filter/get · scan_filter/parameters · scan_query/get · scan_query/save                                                                       |
+| 画图     | drawing/create·update·delete · drawing_set/create·delete · drawing_sets · drawings                                                                |
+| 搜索     | instrument_search · analyst_reports/token                                                                                                         |
+| 交易     | **两步下单 CONFIRM→SUBMIT（同草稿 id，库内部处理）** · replaceOrder(EDIT_ORDER) · cancel_order · order_events · order_history                     |
+| 告警     | alerts/create · alerts/cancel · alerts/lookup · alerts/subscribe                                                                                  |
+| 自选列表 | watchlist get/categories/create/rename/delete/**add/remove/rearrange**                                                                            |
+| 消息中心 | message_center/get · message_center/subscribe                                                                                                     |
+| 其他     | unsubscribe（订阅清理）· 客服聊天（chat/create·close·send_message · support_chat/messages · chat_global/messages）· demo_account(⚠️) · logoff(⚠️) |
+
+> **连接层内置**（默认开启）：断线指数退避自动重连（0.5s→30s+jitter）、心跳看门狗（10s）、
+> 握手/登录超时（15s）、重连后活跃流式订阅原样重放；错误全部为 Error 子类
+> （`WebSocketApiError`/`AuthError`/`TransportError`）。
+>
+> 注：`news_headers/get`、`fundamentals/current`、`studies/get`、`options_statistics`、
+> `order_history`、`tax_lot/get` 等已具备完整 handler（协议/参数实测背书），门面方法
+> 正在收尾接入；接入前可直接用对应 `*MessageHandler` 构造请求。
 
 # 已知限制
 
-- 部分服务（news/relevant、screener、study/subscribe、tax_lot 深查）对 guest 账号权限受限，
-  已在真实账户范围外标注；库 API 仍提供，成功帧待真实账户确认。
-- 长连接重连/心跳看门狗/订阅重放正在阶段 1 重构（`agent/05`）。
-- 私有协议，服务器 build 会漂移；`pnpm` 脚本与 `agent/tools/probe-*.mjs` 可随时重新普查。
+- 部分服务（news/relevant、screener、study/subscribe、tax_lot 深查、fundamentals/history）
+  对 guest 账号权限受限，已在真实账户范围外标注；库 API 仍提供，成功帧待真实账户确认。
+- token 自动续期（Authenticator）已具备 `access_token/get` 通道；guest 无 refreshToken，
+  端到端续期回归需真实账户。
+- 私有协议，服务器 build 会漂移；`pnpm run ci` 与 `agent/tools/probe-*.mjs` 可随时重新普查
+  （注意 pnpm v12 里裸 `pnpm ci` 是 install 别名假绿）。
 
 # 用法
 
