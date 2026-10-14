@@ -8,6 +8,10 @@ import MarketDepthStateUpdater from "./marketDepthStateUpdater.js";
 import { getAuthCode } from "./browserOauth.js";
 import { MarketDepthResponse } from "../client/services/marketDepthMessageHandler.js";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import Authenticator from "../auth/authenticator.js";
+
+/** login/schwab 走的是 TOSWeb 客户端（agent/02）；access_token/get 同口径 */
+const REAL_CLIENT_ID = "TOSWeb";
 
 const logger = debug("testapp");
 
@@ -188,10 +192,41 @@ async function run() {
   const client = new RealWsJsonClient();
   if (accessToken && refreshToken) {
     await client.authenticateWithAccessToken({ accessToken, refreshToken });
+    // R1 token 续期：23h 阈值后经 access_token/get（wsjson 通道）自动换 token。
+    // refreshToken 一次性轮换——onTokenRotated 必须持久化，否则下次登录用作废值。
+    // guest 会话无 refreshToken，Authenticator 直通并 warn 一次（不可续期）。
+    client.setAuthenticator(
+      new Authenticator({
+        clientId: process.env.TOS_CLIENT_ID ?? REAL_CLIENT_ID,
+        initial: { accessToken, refreshToken },
+        channel: client,
+        onTokenRotated: (tokens) =>
+          storeTokenInDotEnvFile(
+            tokens.accessToken,
+            tokens.refreshToken ?? refreshToken,
+          ),
+      }),
+    );
   } else if (username && password) {
     const authCode = await getAuthCode(username, password);
     await client.authenticateWithAuthCode(authCode);
     storeTokenInDotEnvFile(client.accessToken!, client.refreshToken!);
+    // login/schwab 响应带回的 refreshToken（agent/06 F4）同样挂上续期器
+    client.setAuthenticator(
+      new Authenticator({
+        clientId: process.env.TOS_CLIENT_ID ?? REAL_CLIENT_ID,
+        initial: {
+          accessToken: client.accessToken!,
+          refreshToken: client.refreshToken,
+        },
+        channel: client,
+        onTokenRotated: (tokens) =>
+          storeTokenInDotEnvFile(
+            tokens.accessToken,
+            tokens.refreshToken ?? client.refreshToken ?? "",
+          ),
+      }),
+    );
   } else {
     throw new Error(
       "TOS_GUEST_ACCESS_TOKEN or TOS_ACCESS_TOKEN or TOS_USERNAME and TOS_PASSWORD env vars must be set",

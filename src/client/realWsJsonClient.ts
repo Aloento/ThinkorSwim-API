@@ -204,6 +204,7 @@ import {
   throwError,
 } from "./util.js";
 import { WsJsonClient } from "./wsJsonClient.js";
+import Authenticator from "../auth/authenticator.js";
 
 export const CONNECTION_REQUEST_MESSAGE = {
   ver: "27.*.*",
@@ -349,6 +350,8 @@ export class RealWsJsonClient implements WsJsonClient {
     authCode?: string;
     accessToken?: string;
     refreshToken?: string;
+    /** accessToken 获取时刻（epoch ms），Authenticator 续期挂点用 */
+    obtainedAt?: number;
   } = {};
   private readonly options: RealWsJsonClientOptions;
   private readonly handshakeTimeoutMs: number;
@@ -358,6 +361,13 @@ export class RealWsJsonClient implements WsJsonClient {
   private readonly reconnectJitterRatio: number;
   private readonly autoReconnect: boolean;
   private readonly autoUnsubscribe: boolean;
+  /**
+   * 可选的 token 续期器（R1）：重连 re-login 前经 getValidToken() 拿最新
+   * accessToken（跨 24h 的重连不会拿旧 token 去登录）。
+   */
+  private authenticator?: Authenticator;
+  /** 本轮 authenticate() 是否正在等 refresh（防 close 竞态的迟到续发登录帧） */
+  private loginAttemptId = 0;
   /** 构造时注入的 socket（测试注入用）；仅首次连接消费，重连一律走工厂 */
   private injectedSocket?: WebSocket;
   private socket?: WebSocket;
@@ -473,7 +483,8 @@ export class RealWsJsonClient implements WsJsonClient {
     refreshToken?: string;
   }): Promise<RawLoginResponseBody | null> {
     ensure(accessToken, "access token is required");
-    this.credentials = { accessToken, refreshToken };
+    // R1：记录获取时刻——Authenticator 挂点（重连 re-login 前）据此判断续期
+    this.credentials = { accessToken, refreshToken, obtainedAt: Date.now() };
     return await this.handshake();
   }
 
@@ -617,14 +628,47 @@ export class RealWsJsonClient implements WsJsonClient {
     }
   }
 
-  private authenticate() {
+  /**
+   * 注入 token 续期器（R1）：authCode 会话登录成功、或调用方想把已连接
+   * 客户端作为 access_token/get 刷新通道时挂上。
+   */
+  setAuthenticator(authenticator?: Authenticator): void {
+    this.authenticator = authenticator;
+  }
+
+  private authenticate(): void {
     const {
       credentials: { authCode, accessToken },
     } = this;
     if (accessToken) {
-      // if we already have an access token, we can just authenticate with it
-      const handler = findByTypeOrThrow(messageHandlers, LoginMessageHandler);
-      this.sendMessage(handler.buildRequest(accessToken));
+      if (!this.authenticator) {
+        // 无续期器：保持同步发送路径（首轮与重连的常规登录时序不变）
+        this.sendAccessTokenLogin(accessToken);
+        return;
+      }
+      // R1：re-login（含 task-6 重连路径）前经 authenticator 拿有效 token。
+      // refresh 是异步的（access_token/get 走当前连接），期间的断连由
+      // attemptId 守卫丢弃迟到的登录帧，避免旧会话 token 打进新会话。
+      const attemptId = ++this.loginAttemptId;
+      void this.authenticator
+        .getValidToken()
+        .then((token) => {
+          this.credentials.accessToken = token;
+          if (attemptId !== this.loginAttemptId) {
+            debugLog("discarding stale login after token refresh");
+            return;
+          }
+          this.sendAccessTokenLogin(token);
+        })
+        .catch((e) => {
+          if (attemptId !== this.loginAttemptId) return;
+          const err =
+            e instanceof Error
+              ? e
+              : new AuthError(`token refresh failed: ${String(e)}`);
+          debugLog("token refresh before login failed: %O", err);
+          this.handleRefreshFailure(err);
+        });
     } else if (authCode) {
       // exchange the auth code for an access token
       const handler = findByTypeOrThrow(
@@ -635,6 +679,40 @@ export class RealWsJsonClient implements WsJsonClient {
     } else {
       throw new AuthError("no credentials provided, cannot authenticate");
     }
+  }
+
+  private sendAccessTokenLogin(accessToken: string) {
+    // if we already have an access token, we can just authenticate with it
+    const handler = findByTypeOrThrow(messageHandlers, LoginMessageHandler);
+    this.sendMessage(handler.buildRequest(accessToken));
+  }
+
+  /**
+   * 登录前 token 刷新失败：与 handleLoginFailure 同构（首轮终止会话不重试，
+   * 重连尝试中按退避继续——refreshToken 可能只是暂时不可用），区别只在错误
+   * 来自 Authenticator 而非服务端的 login 响应。
+   */
+  private handleRefreshFailure(err: Error) {
+    this.clearHandshakeTimer();
+    this.clearHeartbeat();
+    const wasReconnectAttempt = this.pendingReplayAfterLogin;
+    this.pendingReplayAfterLogin = false;
+    const handshake = this.pendingHandshake;
+    this.pendingHandshake = undefined;
+    // 先摘掉 this.socket 再 close：close 事件被身份守卫忽略，自行决策重试
+    const socket = this.socket;
+    this.socket = undefined;
+    this.state = ChannelState.ERROR;
+    handshake?.reject(err);
+    socket?.close();
+    if (wasReconnectAttempt) {
+      this.scheduleReconnect();
+      return;
+    }
+    this.failReconnectPromise(err);
+    this.drainOneShots(err.message);
+    this.drainPendingSubmissions(err);
+    if (!this.bufferEnded) this.endBuffer();
   }
 
   // ---- 重连与看门狗 ----
@@ -1583,6 +1661,12 @@ export class RealWsJsonClient implements WsJsonClient {
       if (loginResponse.refreshToken) {
         this.credentials.refreshToken = loginResponse.refreshToken;
       }
+      this.credentials.obtainedAt = Date.now();
+      // 登录响应轮换过 token：同步进续期器，避免它拿过期/作废的旧值刷新
+      this.authenticator?.updateTokens({
+        accessToken: body.token,
+        refreshToken: loginResponse.refreshToken,
+      });
       this.onLoginSuccess(body);
     } else {
       this.handleLoginFailure(body);
