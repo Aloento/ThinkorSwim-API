@@ -1,8 +1,7 @@
 # tos-wsjson-client 技术文档
 
-> 本文是仓库全部设计与实测档案（原 `agent/00–08` 九篇工作文档）的**唯一汇总版**，
-> 内容截至 2026-10 黑盒实测收口。协议为私有逆向所得，服务器随时可能漂移；
-> 任何"实测结论"都应视为**当时线上行为的快照**，用 `scripts/probe-*.mjs` 可随时复验。
+> 协议为网页版逆向所得，非官方支持，服务器随时可能变更；任何"实测结论"都应视为
+> **当时线上行为的快照**，用 `scripts/probe-*.mjs` 可随时复验。
 
 ---
 
@@ -25,12 +24,10 @@
 ## 1. 项目概览
 
 `tos-wsjson-client` 是 thinkorswim 网页版私有 WebSocket API（wsjson）的
-Node/浏览器客户端，基于上游 `huskly/tos-wsjson-client` v0.12.0（停更于 2025-12）
-现代化重构：
+Node/浏览器客户端，基于上游 `huskly/tos-wsjson-client` v0.12.0 现代化：
 
 - 工具链：pnpm 12 + TypeScript 7 + Node ≥ 24，CI 四关（prettier / tsc / eslint / jest）。
-- 全部服务经 2026-10 线上黑盒实测校正：guest（PaperMoney）会话 + 真实账户只读回归
-  （真实账户 32 项只读核对 32/32 通过）。
+- 全部服务经线上黑盒实测校正：guest（PaperMoney）会话 + 真实账户只读回归。
 - 服务目录：`ApiService` 77 个服务名、68 个 handler 类全部接入门面
   （接口 / 真实实现 / mock / 双向代理四面同步）。
 - 库内置连接生命周期：指数退避重连（0.5s→30s+jitter）、心跳看门狗（10s）、

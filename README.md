@@ -2,16 +2,19 @@
 
 > 中文 · [English](README.en.md)
 
-Node 和浏览器可用的 thinkorswim 私有 WebSocket API 客户端（黑盒逆向）。
-基于上游 `huskly/tos-wsjson-client` v0.12.0 现代化重构：pnpm + TypeScript 7 +
-Node 24，所有服务经 2026-10 线上黑盒实测校正（guest 模拟盘 + 真实账户只读回归）。
+Node 和浏览器可用的 thinkorswim 私有 WebSocket API 客户端。基于上游
+`huskly/tos-wsjson-client` v0.12.0 现代化：pnpm + TypeScript 7 + Node 24，
+全部服务经线上黑盒实测校正。协议细节、服务参数与实测结论见
+[TECHNICAL.md](TECHNICAL.md)。
 
-🚧 仍属早期（协议私有、随时可能漂移），但核心交易/行情/账户链路已端到端跑通
-真实模拟盘，功能对账与协议细节见 [docs/TECHNICAL.md](docs/TECHNICAL.md)。 🚧
+> ⚠️ 嘉信国际（Charles Schwab International）不提供开发者账户，如需程序化交易
+> 请优先评估官方 API。本仓库使用的 wsjson 是网页版内部协议，非官方支持，服务器
+> 随时可能变更；当前实现已在实盘验证通过，但不保证今后持续可用。使用实盘账户
+> 自动化请务必自带风控。
 
 ## 前置要求
 
-- Node ≥ 24（推荐；`packageManager` 为 pnpm 12，经 corepack 自动启用）
+- Node ≥ 24（pnpm 12 经 corepack 自动启用）
 
 ## 构建
 
@@ -19,97 +22,85 @@ Node 24，所有服务经 2026-10 线上黑盒实测校正（guest 模拟盘 + �
 corepack enable
 pnpm install
 pnpm build          # tsc → dist/
-pnpm test           # jest（含真实线帧回放测试，112 用例）
-pnpm run ci         # prettier + build + lint + test 四关
+pnpm test           # jest（含真实线帧回放测试）
+pnpm run ci         # prettier + build + lint + test
 ```
-
-> ⚠️ pnpm v12 里裸 `pnpm ci` 是 install 别名的"假绿"，验证一律 `pnpm run ci`。
 
 ## 黑盒工具（scripts/）
 
-凭据模板：`cp scripts/.env.blackbox.example scripts/.env.blackbox` 填写
-（gitignored；录制产物 `scripts/artifacts/`、浏览器 profile `scripts/puppeteer-data*/`
-同样不入库，且证据落盘前自动脱敏）。
+凭据：复制 `scripts/.env.blackbox.example` 为 `scripts/.env.blackbox` 并填写。
 
 ```bash
-# L0 匿名握手探针（无凭据，随时可跑）
+# 匿名握手探针（无需凭据）
 node scripts/probe-ws.mjs 10000
 
-# guest 模拟盘：登录收割 token → 端到端冒烟 → 下单/撤单冒烟（$1 限价 1 股自动撤）
+# 模拟盘：登录收割 token → 端到端冒烟 → 下单/撤单冒烟（$1 限价 1 股自动撤）
 node scripts/auth-guest.mjs <user> <pass>
 node scripts/smoke-lib.mjs
 node scripts/smoke-order.mjs
 
-# 只读服务普查（30+ 项，原始帧录制）/ 写用例（paper 硬闸门）
+# 只读服务普查 / 写用例（仅限模拟盘，工具内置硬闸门）
 node scripts/probe-services.mjs [service ...]
 node scripts/probe-write.mjs W1|W2|W4|…
 
-# 真实账户（默认无头；F2A 自动选渠道：移动推送手机点批准 / 短信终端回传码；
-# 自动勾选"信任设备"以签发 refreshToken；--headed 回退有头人工）
+# 真实账户（默认无头登录；F2A 自动处理：移动推送在手机上批准，
+# 或短信验证码在终端输入；--headed 回退有头人工）
 node scripts/auth-real.mjs
-node scripts/smoke-real.mjs          # 32 项只读核对
-node scripts/exp-auth-refresh.mjs    # token 续期链式轮换回归
+node scripts/smoke-real.mjs          # 只读冒烟
+node scripts/exp-auth-refresh.mjs    # token 续期回归
 
 # 覆盖度审计 / 无头指纹矩阵
 node scripts/audit-coverage.mjs
 node scripts/exp-fp.mjs
 ```
 
-旧版 testApp（用户名密码路径 + 代理示例）仍可用：
+旧版示例（用户名密码路径 + 本地代理）：
 
 ```bash
 node --env-file=.env dist/example/testApp.js
 node --env-file=.env dist/example/wsProxyServer.js
 ```
 
-> **本地代理安全**：`WsJsonServerProxy` 默认无鉴权——本机任意进程都能操控它代理的
-> 交易会话。设置 `TOS_PROXY_TOKEN` 后每条代理消息必须携带该 token，不匹配即回
-> `{"error":"unauthorized"}` 并断开；未知 request 回 `unknown request`，非法 JSON 回
-> `invalid json`。多用户机器与非纯本机回环场景**必须**设置 token。
+> 本地代理默认无鉴权，本机任意进程都可操控它代理的会话。设置
+> `TOS_PROXY_TOKEN` 后每条代理消息必须携带该 token，否则直接断开。共享机器或
+> 非本机回环场景必须设置。
 
-## 认证流程（2026-10 线上实测，详见 docs/TECHNICAL.md §4）
+## 认证流程（详见 TECHNICAL.md §4）
 
-1. **账密 → authCode**：登录 `https://trade.thinkorswim.com`（或 `/guestpass`）后，
-   前端用 oauth `code` 调 `POST tosweb-sm…/api/v1/tsm/authorize`，返回的
-   **新 authCode** 才是 wsjson 要的（原始 oauth code 会被 authorize 消费）。
-   工具：`src/auth/guestpass.ts`（`waitForTsmAuthorize` 在浏览器导航时截获）。
-2. **authCode → token**：WS 连 `login/schwab`（`{authCode, clientId, redirectUri,
-tag}`），返回 `token` 与 `accessTokenInfo.refreshToken`。**refreshToken 只在
-   F2A 时勾选"信任设备"才签发**；`login` 帧（token 复用登录）响应不含
-   accessTokenInfo，收割需抓页面 `login/schwab` 帧（`scripts/auth-real.mjs` 已自动化）。
-3. **token → 会话**：`login` 服务复用 token（跨 WS 连接复用，有效期约 24h）。
-   真实账户 F2A 登录默认**无头**：脚本自动代填账密、自动勾选信任设备、优先
-   "Send a mobile notification"（手机点批准即可），无该渠道退"Text Message"
-   （终端回传验证码）。实测 Chrome 155 的 new headless 与有头指纹逐信号一致
-   （`scripts/exp-fp.mjs`），默认 stealth 即复刻已验证指纹。
-4. ⚠️ **数据中心与 token 绑定**：模拟盘必须连
-   `wss://papermoney-services.schwab.com/Services/WsJson`；真实账户连
-   `thinkorswim-services`。连错报 `Invalid token (server session id)`。
+1. 登录 `https://trade.thinkorswim.com`（或 `/guestpass`）后，前端用 oauth
+   `code` 调 `tsm/authorize` 换发新 authCode——wsjson 要的是这个新 authCode，
+   原始 oauth code 已被 authorize 消费。
+2. WS 连 `login/schwab` 用 authCode 换 32 字符会话 token；F2A 时勾选"信任设备"
+   才会签发 refreshToken。
+3. 会话 token 跨 WS 连接复用（约 24h）。真实账户 F2A 支持全自动无头登录
+   （`scripts/auth-real.mjs`）。
+4. token 与数据中心绑定：模拟盘必须连
+   `wss://papermoney-services.schwab.com/Services/WsJson`，真实账户连
+   `thinkorswim-services`，连错报 `Invalid token (server session id)`。
    门面用 `new RealWsJsonClient({ wsUrl: PAPER_WS_URL })` 选择。
 
-## 支持的 API（全部经线上实测，对账表见 docs/TECHNICAL.md §6）
+## 能力一览（对账表见 TECHNICAL.md §6）
 
-| 域       | 能力                                                                                                                                                                                                                                                                                                                                                   |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 认证     | access token / authCode；PAPER 与真实双端点；token 跨连接复用；`getAccessToken`（refreshToken 续期通道，scope `"api"`）· `auth_code/get`                                                                                                                                                                                                               |
-| 账户     | accounts · statement · positions · margin_calls · disclosures(+/accept) · user_properties(+/set) · order_history · tax_lot(get/update) · transactions/categories                                                                                                                                                                                       |
-| 行情     | quotes · quotes/get · chart（extendedHours/priceType/tick，id 可配）· market_depth · market_hours                                                                                                                                                                                                                                                      |
-| 期权     | optionSeries · optionSeries/quotes · option_chain/get · quotes/options · options_statistics                                                                                                                                                                                                                                                            |
-| 基本面   | fundamentals/current(+history) · studies/get · study/categories（27 类 441 指标）· study/subscribe                                                                                                                                                                                                                                                     |
-| 新闻     | news_headers/get · get_relevant · subscribe(_relevant) · news_body                                                                                                                                                                                                                                                                                     |
-| 筛选器   | scan_filter/get · scan_filter/parameters · scan_query/get · scan_query/save                                                                                                                                                                                                                                                                            |
-| 画图     | drawing/create·update·delete · drawing_set/create·delete · drawing_sets · drawings                                                                                                                                                                                                                                                                     |
-| 搜索     | instrument_search · analyst_reports/token                                                                                                                                                                                                                                                                                                              |
-| 交易     | **两步下单 CONFIRM→SUBMIT（同草稿 id，库内部处理）** · LIMIT/MARKET/STOP/STOPLIMIT（判别联合）· tif DAY/GTC/EXT/GTC_EXT/AM/PM · 期权腿 · replaceOrder(EDIT_ORDER) · cancel_order · order_history · **orderEvents 原始流 / observeOrders 归一化事件流（status 映射对齐前端官方枚举）** · **guard 安全闸门（paperOnly/账户白名单/数量/名义额，默认关）** |
-| 告警     | alerts/create · alerts/cancel · alerts/lookup · alerts/subscribe                                                                                                                                                                                                                                                                                       |
-| 自选列表 | watchlist get/categories/create/rename/delete/**add/remove/rearrange**                                                                                                                                                                                                                                                                                 |
-| 消息中心 | message_center/get · message_center/subscribe                                                                                                                                                                                                                                                                                                          |
-| 其他     | unsubscribe（订阅清理）· 客服聊天（chat/create·close·send_message · support_chat/messages · chat_global/messages）· demo_account(⚠️) · logoff(⚠️)                                                                                                                                                                                                      |
+| 域       | 能力                                                                           |
+| -------- | ------------------------------------------------------------------------------ |
+| 认证     | access token / authCode 登录；`getAccessToken` 续期；`auth_code/get`           |
+| 账户     | 账户/对账单/持仓/保证金追缴/披露/用户属性/成交历史/税务批/交易分类             |
+| 行情     | 报价流与一次性报价 · K 线 · 盘口深度 · 交易时段                                |
+| 期权     | 期权链 · 链上报价 · 链详情 · 期权统计                                          |
+| 基本面   | 基本面当前/历史 · 指标目录（441 项）· 指标数值订阅                             |
+| 新闻     | 新闻头/相关性新闻/正文/订阅                                                    |
+| 筛选器   | 筛选条件与参数 / 查询                                                          |
+| 画线     | 画线增删改 · 画线组                                                            |
+| 搜索     | 品种搜索 · 分析师报告                                                          |
+| 交易     | 限价/市价/止损/止损限价单（内部两步 CONFIRM→SUBMIT）· 改单撤单 · 订单事件流（原始 + 归一化 status）· 交易安全闸门 |
+| 告警     | 创建/取消/查询/订阅                                                            |
+| 自选列表 | 建列/改名/删除/增删成分/重排                                                   |
+| 消息中心 | 拉取/订阅                                                                      |
+| 其他     | 订阅清理 · 客服会话 · 演示账户调额(⚠️) · logoff(⚠️)                            |
 
-> **连接层内置**（默认开启）：断线指数退避自动重连（0.5s→30s+jitter）、心跳看门狗
-> （10s）、握手/登录超时（15s）、重连后活跃流式订阅原样重放；for-await 提前
-> break/抛异常自动回收补丁基底并向服务端发 `unsubscribe`（`autoUnsubscribe` 可关）；
-> 错误全部为 Error 子类（`WebSocketApiError`/`AuthError`/`TransportError`）。
+连接层内置：断线指数退避重连、心跳看门狗、握手/登录超时、重连后订阅重放；
+`for-await` 提前退出自动向服务端发 `unsubscribe`；错误均为 Error 子类
+（`WebSocketApiError` / `AuthError` / `TransportError` / `GuardError`）。
 
 ## 用法
 
@@ -129,7 +120,7 @@ for await (const { body: q } of client.quotes(["AAPL", "SPY"])) {
   break; // 第一帧即可
 }
 
-// 下单（内部两步 CONFIRM→SUBMIT；错误帧会以 WebSocketApiError reject）
+// 下单（内部两步 CONFIRM→SUBMIT；服务端报错以 WebSocketApiError reject）
 try {
   const { body: placed } = await client.placeOrder({
     accountNumber: "<paper-account-code>", // getAccounts() 可查
@@ -142,7 +133,7 @@ try {
   if (e instanceof WebSocketApiError) console.error("server:", e.message);
 }
 
-// 订单事件流：归一化 status（WORKING/FILLED/CANCELED/… 对齐前端官方枚举）
+// 订单事件流：归一化 status（WORKING/FILLED/CANCELED/…）
 for await (const event of client.observeOrders("<paper-account-code>")) {
   console.log(event.orderId, event.status, event.filledQuantity);
 }
@@ -150,16 +141,14 @@ for await (const event of client.observeOrders("<paper-account-code>")) {
 
 ## 交易安全闸门（可选，默认关闭）
 
-`RealWsJsonClientOptions.guard` 在 confirmOrder/submitOrder/replaceOrder/
-cancelOrder 入口前置校验，命中即抛 `GuardError`（Promise reject，wire 上零帧）。
-`paperOnly` 判定会话 wsUrl 是否 papermoney 端点；设了 `maxNotionalUsd` 时
-MARKET 单（名义金额不可知）保守拒绝：
+`RealWsJsonClientOptions.guard` 在下单/改单/撤单入口前置校验，违规即抛
+`GuardError`，请求不会发出：
 
 ```typescript
 const client = new RealWsJsonClient({
   wsUrl: PAPER_WS_URL,
   guard: {
-    paperOnly: true,
+    paperOnly: true, // 仅允许模拟盘端点
     allowedAccountCodes: ["<paper-account-code>"],
     maxQuantity: 100,
     maxNotionalUsd: 5000,
@@ -171,18 +160,12 @@ const client = new RealWsJsonClient({
 
 ## 已知限制
 
-- 部分服务对 guest 权限受限（news/relevant、screener、tax_lot 深查等）——已在
-  真实账户全部回归（`smoke-real.mjs` 32/32）；仅写路径（tax_lot/update、drawing 写、
-  saveScanQuery、客服会话写、demo_account）按测试纪律不进真实账户自动化。
-- token 自动续期：`Authenticator`（src/auth/authenticator.ts）23h 阈值内经
-  `access_token/get`（scope `"api"`）自动换 token，`onTokenRotated` 回调必须持久化
-  轮换后的新 refreshToken（一次性轮换，端到端链式续期已验证）。⚠️ 语义注意：
-  续期返回的 accessToken 是 **EAT**（供 EAT 鉴权的 REST/服务），不是 wsjson
-  `login` 帧用的 32 字符会话 token——会话 token 到期需重新走登录链。
-- `market_depth` 真实账户裸 wsjson 会话请求被接受但不推深度帧（页面走带额外订阅
-  上下文的大流程）；guest 能收 snapshot。参数正确、非实现缺口，属服务端环境限制。
-- 私有协议，服务器 build 会漂移；`pnpm run ci` 与 `scripts/probe-*.mjs` 可随时重新普查。
-
-## License
-
-MIT
+- 部分服务对 guest 会话权限受限（新闻相关性、筛选器、税务批深查等），真实账户
+  正常；写类接口按测试纪律未做真实账户自动化。
+- token 自动续期（`src/auth/authenticator.ts`）经 `access_token/get` 换发的
+  accessToken 是 EAT，不用于 wsjson 登录帧；会话 token 到期需重走登录链。
+  refreshToken 为一次性轮换，`onTokenRotated` 回调里必须持久化新值。
+- `market_depth` 在真实账户裸会话中请求被接受但不推深度帧（页面走带额外订阅
+  上下文的流程）；guest 可收 snapshot。
+- 私有协议会漂移：服务器 build 持续迭代，服务参数、枚举、错误结构都可能变化。
+  用 `pnpm run ci` 与 `scripts/probe-services.mjs` 可随时重新普查。
