@@ -1,6 +1,7 @@
 import ws from "ws";
 import debug from "debug";
 import {
+  ALL_REQUESTS,
   ProxiedRequest,
   ProxiedResponse,
 } from "../client/wsJsonClientProxy.js";
@@ -8,6 +9,20 @@ import { WsJsonClient } from "../client/wsJsonClient.js";
 import { Disposable } from "./disposable.js";
 
 const logger = debug("wsJsonServerProxy");
+
+// S3（task-15）：request 白名单——客户端可发任意 JSON，switch 未命中的
+// request 此前被静默吞掉（客户端 promise 永挂）。改为显式回错。
+const REQUEST_SET: ReadonlySet<string> = new Set<string>(ALL_REQUESTS);
+
+export type WsJsonServerProxyOptions = {
+  /**
+   * S1（task-15）：共享 token 鉴权。设置后每条客户端消息必须携带相同的
+   * 顶层 `token` 字段（WsJsonClientProxy 配了 authToken 会自动附带），
+   * 不匹配回 `{error:"unauthorized"}` 并断开连接。未设置保持旧行为
+   * （无鉴权）——本地代理默认信任本机，生产/多用户机器建议设置。
+   */
+  authToken?: string;
+};
 
 /**
  * Sits in between two WebSocket connections and proxies messages between them. The client `downstream` connection is
@@ -21,6 +36,7 @@ export default class WsJsonServerProxy implements Disposable {
   constructor(
     private readonly downstream: ws,
     private readonly wsJsonClientFactory: () => WsJsonClient,
+    private readonly options?: WsJsonServerProxyOptions,
   ) {
     downstream.on("error", console.error);
     downstream.on("message", (data: string) => this.onClientMessage(data));
@@ -33,9 +49,31 @@ export default class WsJsonServerProxy implements Disposable {
   }
 
   private onClientMessage = async (data: string) => {
-    const msg = JSON.parse(data) as ProxiedRequest;
+    // 非法 JSON 此前是 unhandled rejection（可让进程崩溃的攻击面），
+    // 现在回错并保留连接。
+    let msg: ProxiedRequest;
+    try {
+      msg = JSON.parse(data) as ProxiedRequest;
+    } catch {
+      this.downstream.send(JSON.stringify({ error: "invalid json" }));
+      return;
+    }
     logger("⬅️\treceived %O", msg);
     const { request } = msg;
+    // S1：token 校验先于一切业务分发；不匹配回错并断开（含上游）。
+    if (
+      this.options?.authToken !== undefined &&
+      msg.token !== this.options.authToken
+    ) {
+      this.downstream.send(JSON.stringify({ error: "unauthorized" }));
+      this.disconnect();
+      return;
+    }
+    // S3：request 白名单——未知方法回错（保持连接，客户端可继续）。
+    if (typeof request !== "string" || !REQUEST_SET.has(request)) {
+      this.downstream.send(JSON.stringify({ error: "unknown request" }));
+      return;
+    }
     switch (request) {
       case "authenticateWithAccessToken":
       case "authenticateWithAuthCode": {

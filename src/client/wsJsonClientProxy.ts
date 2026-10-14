@@ -173,9 +173,19 @@ export type Request = RequestType[number];
 export type ProxiedRequest = {
   request: Request;
   args?: any;
+  /** S1（task-15）：服务端配了 authToken 时随每条消息附带 */
+  token?: string;
 };
 
 export type ProxiedResponse = ProxiedRequest & { response: unknown };
+
+export type WsJsonClientProxyOptions = {
+  /**
+   * S1（task-15）：共享 token。设置后随每条消息附带顶层 token 字段，
+   * 与服务端 WsJsonServerProxyOptions.authToken 一致才能通过校验。
+   */
+  authToken?: string;
+};
 
 // A WsJsonClient proxy implementation that proxies requests to a WebSocket server using the provided `proxyUrl`.
 export class WsJsonClientProxy implements WsJsonClient {
@@ -187,6 +197,7 @@ export class WsJsonClientProxy implements WsJsonClient {
   constructor(
     private readonly proxyUrl: string,
     private readonly options?: any,
+    private readonly proxyOptions?: WsJsonClientProxyOptions,
   ) {}
 
   authenticateWithAuthCode(
@@ -893,7 +904,12 @@ export class WsJsonClientProxy implements WsJsonClient {
 
   private sendMessage(request: ProxiedRequest) {
     this.ensureConnected();
-    this.socket!.send(JSON.stringify(request));
+    // S1（task-15）：配了 authToken 就随每条消息附带（含 disconnect）。
+    const message =
+      this.proxyOptions?.authToken !== undefined
+        ? { ...request, token: this.proxyOptions.authToken }
+        : request;
+    this.socket!.send(JSON.stringify(message));
   }
 
   private dispatch<T>(req: Request, args?: any): Observable<T> {

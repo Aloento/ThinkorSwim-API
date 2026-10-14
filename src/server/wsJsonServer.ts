@@ -3,7 +3,9 @@ import { Server as HttpServer, IncomingMessage, ServerResponse } from "http";
 import { Server as HttpsServer } from "https";
 import { WebSocket, WebSocketServer } from "ws";
 import { WsJsonClient } from "../client/wsJsonClient.js";
-import WsJsonServerProxy from "./wsJsonServerProxy.js";
+import WsJsonServerProxy, {
+  WsJsonServerProxyOptions,
+} from "./wsJsonServerProxy.js";
 
 const logger = debug("wsJsonServer");
 const DEFAULT_PORT = 8080;
@@ -29,12 +31,21 @@ export class WsJsonServer {
     private readonly wsJsonClientFactory: () => WsJsonClient,
     private readonly server: DefaultHttpsServer | DefaultHttpServer,
     private readonly port = DEFAULT_PORT,
+    /** S1（task-15）：透传给每个连接的 WsJsonServerProxy（如 authToken） */
+    private readonly proxyOptions?: WsJsonServerProxyOptions,
   ) {
     this.wss = new WebSocketServer({ server: this.server });
   }
 
   start() {
-    const { wss, server, port, wsJsonClientFactory, activeClients } = this;
+    const {
+      wss,
+      server,
+      port,
+      wsJsonClientFactory,
+      activeClients,
+      proxyOptions,
+    } = this;
 
     wss.on("connection", (ws) => {
       logger("client connected");
@@ -49,7 +60,10 @@ export class WsJsonServer {
           logger("[warn] client disconnected but no client found");
         }
       });
-      activeClients.set(ws, new WsJsonServerProxy(ws, wsJsonClientFactory));
+      activeClients.set(
+        ws,
+        new WsJsonServerProxy(ws, wsJsonClientFactory, proxyOptions),
+      );
     });
 
     wss.on("close", function close() {
