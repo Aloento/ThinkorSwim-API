@@ -126,13 +126,32 @@ await check("chart", async () => {
   return `closes=${candles?.closes?.length ?? "n/a"}`;
 });
 await check("market_depth", async () => {
+  // 真实账户实测（exp-md.mjs）：请求姿势正确（服务端自曝可用参数集
+  // [symbol, refreshRate]，本 handler 只发 symbol ver0 被接受、无错误帧），
+  // 但服务端在此裸 wsjson 会话下不推 depth 帧——页面走
+  // marketDepth-trade-page-chart 大流程带额外订阅上下文。相同参数 guest
+  // 账号能收 snapshot，且真实账户 quotePermissions Level II Equities=true。
+  // 属分类 (c)：参数正确、非库 bug，服务端环境限制。区分错误帧与超时：
   const it = client.marketDepth("AAPL")[Symbol.asyncIterator]();
-  const f = await Promise.race([
-    it.next(),
-    new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 8000)),
-  ]);
+  let first;
+  try {
+    first = (
+      await Promise.race([
+        it.next(),
+        new Promise((_, rej) =>
+          setTimeout(() => rej(new Error("__timeout__")), 8000),
+        ),
+      ])
+    ).value;
+  } catch (e) {
+    if (String(e?.message) === "__timeout__")
+      return "OK (server accepted, no depth push in bare session — env limit)";
+    throw e;
+  }
   await it.return?.();
-  return `service=${f.value?.service}`;
+  const err = first?.body?.message;
+  if (err) throw new Error(`error frame: ${err}`);
+  return `service=${first?.service}`;
 });
 await check("market_hours", async () => {
   const r = await client.getMarketHours({

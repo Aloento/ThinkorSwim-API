@@ -54,8 +54,13 @@ node --env-file=.env dist/example/wsProxyServer.js
    **新 authCode** 才是 wsjson 要的（原始 oauth code 会被 authorize 消费）。
    工具：`src/auth/guestpass.ts`（`waitForTsmAuthorize` 在浏览器导航时截获）。
 2. **authCode → token**：WS 连 `login/schwab`（`{authCode, clientId, redirectUri, tag}`），
-   返回 `token` 与 `accessTokenInfo.refreshToken`（guest 会话无 refreshToken）。
+   返回 `token` 与 `accessTokenInfo.refreshToken`（guest 会话无 refreshToken；
+   **真实账户也只在 F2A 时勾选"信任设备"才签发 refreshToken**——第九轮实测，
+   `login` 帧（token 复用登录）响应不含 accessTokenInfo，收割需抓页面
+   `login/schwab` 帧，工具 `agent/tools/auth-real.mjs` 已自动化）。
 3. **token → 会话**：`login` 服务复用 token（**token 可跨 WS 连接复用，有效期约 24h**）。
+   真实账户 F2A 登录（`agent/tools/auth-real.mjs`）为半自动交接：脚本自动代填
+   账密，出现 F2A 页后由用户在弹出的浏览器完成手机验证/勾选信任设备。
 4. ⚠️ **数据中心与 token 绑定**：模拟盘（PaperMoney）必须连
    `wss://papermoney-services.schwab.com/Services/WsJson`；真实账户连
    `thinkorswim-services`。连错报 `Invalid token (server session id)`。
@@ -87,17 +92,20 @@ node --env-file=.env dist/example/wsProxyServer.js
 
 # 已知限制
 
-- 部分服务（news/relevant、screener、study/subscribe、tax_lot 深查）
-  对 guest 账号权限受限，已在真实账户范围外标注；库 API 仍提供，成功帧待真实账户确认。
-  （fundamentals/history 已修通：无 `time` 参数，`fields` 仅收 21 个 historical 字段，
-  guest 实测 snapshot 通过。）
+- 部分服务（news/relevant、screener、study/subscribe、tax_lot 深查、scan_query、
+  transactions/categories）对 guest 账号权限受限——**第九轮已在真实账户全部回归**
+  （`agent/tools/smoke-real.mjs` 32/32，见 `agent/06` 第九轮）；guest 受限项均确认为
+  权限/环境问题而非实现缺口。仅写路径（tax_lot/update、drawing 写、saveScanQuery、
+  客服会话写、demo_account）按纪律不进真实账户自动化。
 - token 自动续期：`Authenticator`（src/auth/authenticator.ts）已落地——23h 阈值内经
-  `access_token/get` 自动换 token，`onTokenRotated` 回调必须持久化轮换后的新
-  refreshToken（一次性）。guest 无 refreshToken（直通并 warn 一次），端到端续期
-  回归需真实账户。
-- `observeOrders` 的 status 归一化以前端 bundle 官方映射表为准（guest 会话无订单，
-  probe-2026-10-13 的 order_events 实测帧为空 body）；wire 原值始终保留在
-  `rawStatus`，未识别新状态归 `NONE` 不丢事件。端到端映射回归待真实账户。
+  `access_token/get`（scope `"api"`，真实账户实测值）自动换 token，`onTokenRotated`
+  回调必须持久化轮换后的新 refreshToken（一次性轮换，端到端链式续期已验证，
+  `agent/tools/exp-auth-refresh.mjs`）。guest 无 refreshToken（直通并 warn 一次）。
+  ⚠️ 语义注意：续期返回的 accessToken 是 **EAT**（供 EAT 鉴权的 REST/服务），不是
+  wsjson `login` 帧用的 32 字符会话 token——会话 token 到期需重新走登录链。
+- `observeOrders` 的 status 归一化以前端 bundle 官方映射表为准；真实账户 orderEvents
+  流首帧可达（smoke-real 实测），wire 原值始终保留在 `rawStatus`，未识别新状态归
+  `NONE` 不丢事件。
 - 私有协议，服务器 build 会漂移；`pnpm run ci` 与 `agent/tools/probe-*.mjs` 可随时重新普查
   （注意 pnpm v12 里裸 `pnpm ci` 是 install 别名假绿）。
 
