@@ -395,9 +395,10 @@ export interface WsJsonClient extends Disposable {
   getTaxLots(request: TaxLotGetRequestParams): Promise<ParsedPayloadResponse>;
 
   /**
-   * transactions/categories：交易分类目录（guest 未测标注）。
-   * 契约表写 `getTransactionCategories()`，但 handler 实测参数为
-   * {account}（06 §4），故保留参数。
+   * transactions/categories：账户交易流水分类目录。
+   * 真实账户实测（exp-tc.mjs）：6 参数 {startTime,endTime,account,
+   * transactionCategories,cryptoTransactionTypes,cashFutureTransactionTypes}
+   * 必填（后三个可空数组），只发 account 报校验错误。
    */
   getTransactionCategories(
     request: TransactionsCategoriesRequestParams,
