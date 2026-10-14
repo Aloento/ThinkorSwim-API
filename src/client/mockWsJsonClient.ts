@@ -1,12 +1,51 @@
+import { AccessTokenGetRequestParams } from "./services/accessTokenGetMessageHandler.js";
+import { AuthCodeGetRequestParams } from "./services/authCodeGetMessageHandler.js";
 import { CancelOrderResponse } from "./services/cancelOrderMessageHandler.js";
+import {
+  ChatCloseRequestParams,
+  ChatCreateRequestParams,
+  ChatSendMessageRequestParams,
+  SupportChatMessagesRequestParams,
+} from "./services/supportChatMessageHandlers.js";
 import { ChartRequestParams } from "./services/chartMessageHandler.js";
 import { CreateAlertRequestParams } from "./services/createAlertMessageHandler.js";
+import {
+  DemoAccountAdjustCashRequestParams,
+  DemoAccountSetBalanceRequestParams,
+} from "./services/demoAccountMessageHandlers.js";
+import {
+  DrawingCreateRequestParams,
+  DrawingDeleteRequestParams,
+  DrawingSetCreateRequestParams,
+  DrawingSetDeleteRequestParams,
+  DrawingUpdateRequestParams,
+} from "./services/drawingMessageHandlers.js";
+import {
+  DrawingsRequestParams,
+  DrawingSetsRequestParams,
+} from "./services/drawingSetsMessageHandlers.js";
+import { FundamentalsHistoryRequestParams } from "./services/fundamentalsHistoryMessageHandler.js";
+import { LogoffSchwabRequestParams } from "./services/logoffSchwabMessageHandler.js";
 import { RawLoginResponseBody } from "./services/loginMessageHandler.js";
 import { MarketHoursRequestParams } from "./services/marketHoursMessageHandler.js";
+import {
+  NewsBodyRequestParams,
+  NewsHeadersSubscribeRelevantRequestParams,
+} from "./services/newsBodyMessageHandlers.js";
+import { NewsHeadersGetRelevantRequestParams } from "./services/newsHeadersGetRelevantMessageHandler.js";
+import { NewsHeadersSubscribeRequestParams } from "./services/newsHeadersSubscribeMessageHandler.js";
 import { OptionChainDetailsRequest } from "./services/optionChainDetailsMessageHandler.js";
 import { OptionQuotesRequestParams } from "./services/optionQuotesMessageHandler.js";
 import { PlaceLimitOrderRequestParams } from "./services/placeOrderMessageHandler.js";
+import { QuotesGetRequestParams } from "./services/quotesGetMessageHandler.js";
+import { ScanFilterGetRequestParams } from "./services/scanFilterGetMessageHandler.js";
+import { ScanFilterParametersRequestParams } from "./services/scanFilterParametersMessageHandler.js";
+import { ScanQueryGetRequestParams } from "./services/scanQueryGetMessageHandler.js";
+import { ScanQuerySaveRequestParams } from "./services/scanQuerySaveMessageHandler.js";
+import { StudySubscribeRequestParams } from "./services/studySubscribeMessageHandler.js";
 import { ReplaceOrderRequestParams } from "./services/submitOrderMessageHandler.js";
+import { TaxLotUpdateRequestParams } from "./services/taxLotUpdateMessageHandler.js";
+import { UnsubscribeRequestParams } from "./services/unsubscribeMessageHandler.js";
 import { WatchlistCategoriesRequestParams } from "./services/watchlistCategoriesMessageHandler.js";
 import { WatchlistCreateRequestParams } from "./services/watchlistCreateMessageHandler.js";
 import { WatchlistRenameRequestParams } from "./services/watchlistRenameMessageHandler.js";
@@ -363,5 +402,260 @@ export default class MockWsJsonClient implements WsJsonClient {
       service: "watchlist/rearrange",
       body: {},
     });
+  }
+
+  // ---- 第四批 fixture（与真实响应骨架一致，字段取保守空值）----
+
+  getStudyCategories(): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "study/categories",
+      body: { categories: [{ name: "Trend", studies: ["SimpleMovingAvg"] }] },
+    });
+  }
+
+  async *subscribeStudies(
+    _: StudySubscribeRequestParams,
+  ): AsyncIterable<ParsedPayloadResponse> {
+    return yield { service: "study/subscribe", body: {} };
+  }
+
+  getScanFilters(
+    _: ScanFilterGetRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "scan_filter/get",
+      body: { scanFilters: { STOCK: { filters: ["Price"] } } },
+    });
+  }
+
+  getScanFilterParameters(
+    _: ScanFilterParametersRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({ service: "scan_filter/parameters", body: {} });
+  }
+
+  getScanQuery(_: ScanQueryGetRequestParams): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({ service: "scan_query/get", body: {} });
+  }
+
+  saveScanQuery(_: ScanQuerySaveRequestParams): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({ service: "scan_query/save", body: {} });
+  }
+
+  getQuotes(request: QuotesGetRequestParams): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "quotes/get",
+      body: {
+        items: request.symbols.map((symbol) => ({
+          symbol,
+          isDelayed: true,
+          values: {},
+        })),
+      },
+    });
+  }
+
+  getFundamentalsHistory(
+    _: FundamentalsHistoryRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({ service: "fundamentals/history", body: {} });
+  }
+
+  getAccessToken(
+    request: AccessTokenGetRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "access_token/get",
+      body: {
+        accessExpiresIn: 300,
+        accessToken: "mock-access-token",
+        refreshToken: request.refreshToken,
+      },
+    });
+  }
+
+  getAuthCode(_: AuthCodeGetRequestParams): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "auth_code/get",
+      body: { code: "mock" },
+    });
+  }
+
+  getAnalystReportsToken(): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "analyst_reports/token",
+      body: {
+        uuid: "mock-uuid",
+        accessToken: "mock-analyst-token",
+        grantType: "Bearer",
+        refreshIntervalMillis: 3_600_000,
+      },
+    });
+  }
+
+  createDrawing(
+    request: DrawingCreateRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "drawing/create",
+      body: { drawing: { ...request.drawing, guid: "mock-drawing-guid" } },
+    });
+  }
+
+  updateDrawing(
+    request: DrawingUpdateRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "drawing/update",
+      body: { drawing: { ...request.drawing, guid: request.drawingGuid } },
+    });
+  }
+
+  deleteDrawing(_: DrawingDeleteRequestParams): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({ service: "drawing/delete", body: {} });
+  }
+
+  createDrawingSet(
+    request: DrawingSetCreateRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "drawing_set/create",
+      body: {
+        drawingSet: { guid: "mock-set-guid", name: request.name },
+      },
+    });
+  }
+
+  deleteDrawingSet(
+    _: DrawingSetDeleteRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({ service: "drawing_set/delete", body: {} });
+  }
+
+  getDrawingSets(_: DrawingSetsRequestParams): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "drawing_sets",
+      body: {
+        drawingSets: [
+          { guid: "mock-set-guid", name: "Default", isDefault: true },
+        ],
+      },
+    });
+  }
+
+  getDrawings(_: DrawingsRequestParams): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({ service: "drawings", body: { drawings: [] } });
+  }
+
+  getRelevantNews(
+    _: NewsHeadersGetRelevantRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "news_headers/get_relevant",
+      body: { news: [] },
+    });
+  }
+
+  async *subscribeNews(
+    _: NewsHeadersSubscribeRequestParams,
+  ): AsyncIterable<ParsedPayloadResponse> {
+    return yield { service: "news_headers/subscribe", body: { news: [] } };
+  }
+
+  async *subscribeRelevantNews(
+    _: NewsHeadersSubscribeRelevantRequestParams,
+  ): AsyncIterable<ParsedPayloadResponse> {
+    return yield {
+      service: "news_headers/subscribe_relevant",
+      body: { news: [] },
+    };
+  }
+
+  newsBody(request: NewsBodyRequestParams): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "news_body",
+      body: { newsCode: request.newsCode, text: "" },
+    });
+  }
+
+  createChat(request: ChatCreateRequestParams): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "chat/create",
+      body: {
+        succeeded: true,
+        chatRoom: { chatId: 1, name: request.newChatName },
+      },
+    });
+  }
+
+  closeChat(_: ChatCloseRequestParams): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "chat/close",
+      body: { succeeded: true },
+    });
+  }
+
+  sendChatMessage(
+    _: ChatSendMessageRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "chat/send_message",
+      body: { succeeded: true, messageId: 1 },
+    });
+  }
+
+  getSupportChatMessages(
+    request: SupportChatMessagesRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "support_chat/messages",
+      body: { chatRoom: { chatId: request.chatId } },
+    });
+  }
+
+  updateTaxLot(
+    request: TaxLotUpdateRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "tax_lot/update",
+      body: { refreshToken: request.refreshToken, orderStatuses: [] },
+    });
+  }
+
+  unsubscribe(
+    request: UnsubscribeRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "unsubscribe",
+      body: {
+        targetService: String(request.targetService),
+        targetRequestId: request.targetRequestId,
+      },
+    });
+  }
+
+  /** ⚠️ 危险操作的 mock：仅回固定成功骨架，见 WsJsonClient 接口注释。 */
+  demoAccountSetBalance(
+    request: DemoAccountSetBalanceRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "demo_account/set_balance",
+      body: { accountCode: request.accountCode },
+    });
+  }
+
+  /** ⚠️ 危险操作的 mock：仅回固定成功骨架，见 WsJsonClient 接口注释。 */
+  demoAccountAdjustCash(
+    request: DemoAccountAdjustCashRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "demo_account/adjust_cash",
+      body: { accountCode: request.accountCode },
+    });
+  }
+
+  /** ⚠️ 危险操作的 mock：不会真的终止会话，见 WsJsonClient 接口注释。 */
+  logoff(_: LogoffSchwabRequestParams): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({ service: "logoff/schwab", body: {} });
   }
 }

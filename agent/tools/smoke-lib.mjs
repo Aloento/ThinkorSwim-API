@@ -1,6 +1,6 @@
 // 端到端冒烟：用编译后的库 API（RealWsJsonClient）跑 guest paper 会话。
 // 前置：pnpm build 且 agent/tools/.env.blackbox 有 TOS_GUEST_ACCESS_TOKEN（过期则先跑 auth-guest.mjs）。
-// 验证门面方法在真实服务器上的行为：login→accounts→statement→market_hours→quotes→watchlist。
+// 验证门面方法在真实服务器上的行为：login→accounts→statement→market_hours→quotes→watchlist→第四批(study/scan/quotes/get)。
 import { config } from "dotenv";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -108,6 +108,38 @@ try {
   // 闭环收尾：无论中间步骤成败都删掉临时 watchlist
   const del = await client.deleteWatchlist(createdId);
   console.log("[smoke] watchlist/delete:", del.service, "ok");
+}
+
+// 第四批门面冒烟（guest 实测可达，lead 已在裸 ws 层验证三条全通）：
+// study/categories / scan_filter/get / quotes/get。
+// ⚠️ 绝不在冒烟里调用 logoff / demo_account_*——终结会话、破坏性资金操作。
+const studyCats = await client.getStudyCategories();
+const studyCatCount = studyCats.body.categories?.length ?? 0;
+console.log("[smoke] study/categories: categories=", studyCatCount);
+if (studyCatCount === 0) {
+  console.error("[smoke] FAIL: study/categories returned no categories");
+  process.exit(1);
+}
+
+const scanFilters = await client.getScanFilters();
+const stockFilters = scanFilters.body.scanFilters?.STOCK?.filters ?? [];
+console.log("[smoke] scan_filter/get: STOCK filters=", stockFilters.length);
+if (stockFilters.length === 0) {
+  console.error("[smoke] FAIL: scan_filter/get STOCK.filters is empty");
+  process.exit(1);
+}
+
+const quoteSnap = await client.getQuotes({ symbols: ["AAPL"] });
+const firstItem = quoteSnap.body.items?.[0];
+console.log(
+  "[smoke] quotes/get:",
+  firstItem?.symbol,
+  "LAST=",
+  firstItem?.values?.LAST,
+);
+if (!firstItem?.values) {
+  console.error("[smoke] FAIL: quotes/get returned no items[0].values");
+  process.exit(1);
 }
 
 client.disconnect();

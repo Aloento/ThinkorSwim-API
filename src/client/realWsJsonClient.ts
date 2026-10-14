@@ -13,6 +13,86 @@ import {
   isSchwabLoginResponse,
 } from "./messageTypeHelpers.js";
 import ResponseParser from "./responseParser.js";
+// ---- 第四批 handler 与其参数类型（task-8，agent/07 §第四批接入契约）----
+import AccessTokenGetMessageHandler, {
+  AccessTokenGetRequestParams,
+} from "./services/accessTokenGetMessageHandler.js";
+import AnalystReportsTokenMessageHandler from "./services/analystReportsTokenMessageHandler.js";
+import AuthCodeGetMessageHandler, {
+  AuthCodeGetRequestParams,
+} from "./services/authCodeGetMessageHandler.js";
+import ChatCreateMessageHandler, {
+  ChatCloseMessageHandler,
+  ChatCloseRequestParams,
+  ChatCreateRequestParams,
+  ChatSendMessageMessageHandler,
+  ChatSendMessageRequestParams,
+  SupportChatMessagesMessageHandler,
+  SupportChatMessagesRequestParams,
+} from "./services/supportChatMessageHandlers.js";
+import DemoAccountSetBalanceMessageHandler, {
+  DemoAccountAdjustCashMessageHandler,
+  DemoAccountAdjustCashRequestParams,
+  DemoAccountSetBalanceRequestParams,
+} from "./services/demoAccountMessageHandlers.js";
+import DrawingCreateMessageHandler, {
+  DrawingCreateRequestParams,
+  DrawingDeleteMessageHandler,
+  DrawingDeleteRequestParams,
+  DrawingSetCreateMessageHandler,
+  DrawingSetCreateRequestParams,
+  DrawingSetDeleteMessageHandler,
+  DrawingSetDeleteRequestParams,
+  DrawingUpdateMessageHandler,
+  DrawingUpdateRequestParams,
+} from "./services/drawingMessageHandlers.js";
+import DrawingSetsMessageHandler, {
+  DrawingsMessageHandler,
+  DrawingsRequestParams,
+  DrawingSetsRequestParams,
+} from "./services/drawingSetsMessageHandlers.js";
+import FundamentalsHistoryMessageHandler, {
+  FundamentalsHistoryRequestParams,
+} from "./services/fundamentalsHistoryMessageHandler.js";
+import LogoffSchwabMessageHandler, {
+  LogoffSchwabRequestParams,
+} from "./services/logoffSchwabMessageHandler.js";
+import NewsHeadersSubscribeRelevantMessageHandler, {
+  NewsBodyMessageHandler,
+  NewsBodyRequestParams,
+  NewsHeadersSubscribeRelevantRequestParams,
+} from "./services/newsBodyMessageHandlers.js";
+import NewsHeadersGetRelevantMessageHandler, {
+  NewsHeadersGetRelevantRequestParams,
+} from "./services/newsHeadersGetRelevantMessageHandler.js";
+import NewsHeadersSubscribeMessageHandler, {
+  NewsHeadersSubscribeRequestParams,
+} from "./services/newsHeadersSubscribeMessageHandler.js";
+import QuotesGetMessageHandler, {
+  QuotesGetRequestParams,
+} from "./services/quotesGetMessageHandler.js";
+import ScanFilterGetMessageHandler, {
+  ScanFilterGetRequestParams,
+} from "./services/scanFilterGetMessageHandler.js";
+import ScanFilterParametersMessageHandler, {
+  ScanFilterParametersRequestParams,
+} from "./services/scanFilterParametersMessageHandler.js";
+import ScanQueryGetMessageHandler, {
+  ScanQueryGetRequestParams,
+} from "./services/scanQueryGetMessageHandler.js";
+import ScanQuerySaveMessageHandler, {
+  ScanQuerySaveRequestParams,
+} from "./services/scanQuerySaveMessageHandler.js";
+import StudyCategoriesMessageHandler from "./services/studyCategoriesMessageHandler.js";
+import StudySubscribeMessageHandler, {
+  StudySubscribeRequestParams,
+} from "./services/studySubscribeMessageHandler.js";
+import TaxLotUpdateMessageHandler, {
+  TaxLotUpdateRequestParams,
+} from "./services/taxLotUpdateMessageHandler.js";
+import UnsubscribeMessageHandler, {
+  UnsubscribeRequestParams,
+} from "./services/unsubscribeMessageHandler.js";
 import AccountsMessageHandler from "./services/accountsMessageHandler.js";
 import AlertLookupMessageHandler from "./services/alertLookupMessageHandler.js";
 import CancelAlertMessageHandler from "./services/cancelAlertMessageHandler.js";
@@ -145,6 +225,39 @@ const messageHandlers: WebSocketApiMessageHandler<never>[] = [
   new WatchlistAddMessageHandler(),
   new WatchlistRemoveMessageHandler(),
   new WatchlistRearrangeMessageHandler(),
+  // ---- 第四批（task-9）：全部 31 个 handler 注册（dispatchOneShot/
+  // dispatchHandler 经 findByTypeOrThrow 查表，漏注册 = 运行时抛错）----
+  new StudyCategoriesMessageHandler(),
+  new StudySubscribeMessageHandler(),
+  new ScanFilterGetMessageHandler(),
+  new ScanFilterParametersMessageHandler(),
+  new ScanQueryGetMessageHandler(),
+  new ScanQuerySaveMessageHandler(),
+  new QuotesGetMessageHandler(),
+  new FundamentalsHistoryMessageHandler(),
+  new AccessTokenGetMessageHandler(),
+  new AuthCodeGetMessageHandler(),
+  new AnalystReportsTokenMessageHandler(),
+  new DrawingCreateMessageHandler(),
+  new DrawingUpdateMessageHandler(),
+  new DrawingDeleteMessageHandler(),
+  new DrawingSetCreateMessageHandler(),
+  new DrawingSetDeleteMessageHandler(),
+  new DrawingSetsMessageHandler(),
+  new DrawingsMessageHandler(),
+  new NewsHeadersGetRelevantMessageHandler(),
+  new NewsHeadersSubscribeMessageHandler(),
+  new NewsHeadersSubscribeRelevantMessageHandler(),
+  new NewsBodyMessageHandler(),
+  new ChatCreateMessageHandler(),
+  new ChatCloseMessageHandler(),
+  new ChatSendMessageMessageHandler(),
+  new SupportChatMessagesMessageHandler(),
+  new TaxLotUpdateMessageHandler(),
+  new UnsubscribeMessageHandler(),
+  new DemoAccountSetBalanceMessageHandler(),
+  new DemoAccountAdjustCashMessageHandler(),
+  new LogoffSchwabMessageHandler(),
 ];
 
 export const DEFAULT_WS_URL =
@@ -916,6 +1029,199 @@ export class RealWsJsonClient implements WsJsonClient {
 
   userProperties(): Promise<ParsedPayloadResponse> {
     return this.dispatchOneShot(UserPropertiesMessageHandler, null as never);
+  }
+
+  // ---- 第四批门面（agent/07 §第四批接入契约）----
+  // Promise 型走 dispatchOneShot（断线 reject 不重放）；推送流走 dispatchHandler
+  // （注册进 activeRequests，重连后原样重放）。
+
+  getStudyCategories(): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(StudyCategoriesMessageHandler, undefined);
+  }
+
+  subscribeStudies(
+    request: StudySubscribeRequestParams,
+  ): AsyncIterable<ParsedPayloadResponse> {
+    return this.dispatchHandler(
+      StudySubscribeMessageHandler,
+      request,
+    ).iterable();
+  }
+
+  getScanFilters(
+    request?: ScanFilterGetRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(ScanFilterGetMessageHandler, request);
+  }
+
+  getScanFilterParameters(
+    request: ScanFilterParametersRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(ScanFilterParametersMessageHandler, request);
+  }
+
+  getScanQuery(
+    request: ScanQueryGetRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(ScanQueryGetMessageHandler, request);
+  }
+
+  saveScanQuery(
+    request: ScanQuerySaveRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(ScanQuerySaveMessageHandler, request);
+  }
+
+  getQuotes(request: QuotesGetRequestParams): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(QuotesGetMessageHandler, request);
+  }
+
+  getFundamentalsHistory(
+    request: FundamentalsHistoryRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(FundamentalsHistoryMessageHandler, request);
+  }
+
+  getAccessToken(
+    request: AccessTokenGetRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    // token 续期（wsjson 通道）：refreshToken → 新 accessToken。
+    return this.dispatchOneShot(AccessTokenGetMessageHandler, request);
+  }
+
+  getAuthCode(
+    request: AuthCodeGetRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(AuthCodeGetMessageHandler, request);
+  }
+
+  getAnalystReportsToken(): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(AnalystReportsTokenMessageHandler, undefined);
+  }
+
+  createDrawing(
+    request: DrawingCreateRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(DrawingCreateMessageHandler, request);
+  }
+
+  updateDrawing(
+    request: DrawingUpdateRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(DrawingUpdateMessageHandler, request);
+  }
+
+  deleteDrawing(
+    request: DrawingDeleteRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(DrawingDeleteMessageHandler, request);
+  }
+
+  createDrawingSet(
+    request: DrawingSetCreateRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(DrawingSetCreateMessageHandler, request);
+  }
+
+  deleteDrawingSet(
+    request: DrawingSetDeleteRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(DrawingSetDeleteMessageHandler, request);
+  }
+
+  getDrawingSets(
+    request: DrawingSetsRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(DrawingSetsMessageHandler, request);
+  }
+
+  getDrawings(request: DrawingsRequestParams): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(DrawingsMessageHandler, request);
+  }
+
+  getRelevantNews(
+    request: NewsHeadersGetRelevantRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(NewsHeadersGetRelevantMessageHandler, request);
+  }
+
+  subscribeNews(
+    request: NewsHeadersSubscribeRequestParams,
+  ): AsyncIterable<ParsedPayloadResponse> {
+    return this.dispatchHandler(
+      NewsHeadersSubscribeMessageHandler,
+      request,
+    ).iterable();
+  }
+
+  subscribeRelevantNews(
+    request: NewsHeadersSubscribeRelevantRequestParams,
+  ): AsyncIterable<ParsedPayloadResponse> {
+    return this.dispatchHandler(
+      NewsHeadersSubscribeRelevantMessageHandler,
+      request,
+    ).iterable();
+  }
+
+  newsBody(request: NewsBodyRequestParams): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(NewsBodyMessageHandler, request);
+  }
+
+  createChat(request: ChatCreateRequestParams): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(ChatCreateMessageHandler, request);
+  }
+
+  closeChat(request: ChatCloseRequestParams): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(ChatCloseMessageHandler, request);
+  }
+
+  sendChatMessage(
+    request: ChatSendMessageRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(ChatSendMessageMessageHandler, request);
+  }
+
+  getSupportChatMessages(
+    request: SupportChatMessagesRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(SupportChatMessagesMessageHandler, request);
+  }
+
+  updateTaxLot(
+    request: TaxLotUpdateRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(TaxLotUpdateMessageHandler, request);
+  }
+
+  unsubscribe(
+    request: UnsubscribeRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(UnsubscribeMessageHandler, request);
+  }
+
+  /**
+   * ⚠️ 危险：重置模拟盘余额（破坏性资金操作）。见 WsJsonClient 接口注释。
+   */
+  demoAccountSetBalance(
+    request: DemoAccountSetBalanceRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(DemoAccountSetBalanceMessageHandler, request);
+  }
+
+  /**
+   * ⚠️ 危险：模拟盘现金划转（破坏性资金操作）。见 WsJsonClient 接口注释。
+   */
+  demoAccountAdjustCash(
+    request: DemoAccountAdjustCashRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(DemoAccountAdjustCashMessageHandler, request);
+  }
+
+  /**
+   * ⚠️ 危险：终止服务端 Schwab 会话，调用后当前 accessToken 失效。
+   */
+  logoff(request: LogoffSchwabRequestParams): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(LogoffSchwabMessageHandler, request);
   }
 
   marketDepth(symbol: string): AsyncIterable<ParsedPayloadResponse> {

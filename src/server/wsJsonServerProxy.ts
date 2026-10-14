@@ -52,7 +52,12 @@ export default class WsJsonServerProxy implements Disposable {
       case "workingOrders":
       case "marketDepth":
       case "subscribeMessageCenter":
+      case "subscribeStudies":
+      case "subscribeNews":
+      case "subscribeRelevantNews":
         return await this.relayIterable(msg);
+      // 单参/零参方法 → relayPromise 单参分发；第四批（task-9）方法
+      // 全部单对象参数，直接并入本组（双参方法才走 relaySpread）。
       case "createAlert":
       case "cancelAlert":
       case "cancelOrder":
@@ -76,6 +81,34 @@ export default class WsJsonServerProxy implements Disposable {
       case "renameWatchlist":
       case "deleteWatchlist":
       case "reconnect":
+      case "getStudyCategories":
+      case "getScanFilters":
+      case "getScanFilterParameters":
+      case "getScanQuery":
+      case "saveScanQuery":
+      case "getQuotes":
+      case "getFundamentalsHistory":
+      case "getAccessToken":
+      case "getAuthCode":
+      case "getAnalystReportsToken":
+      case "createDrawing":
+      case "updateDrawing":
+      case "deleteDrawing":
+      case "createDrawingSet":
+      case "deleteDrawingSet":
+      case "getDrawingSets":
+      case "getDrawings":
+      case "getRelevantNews":
+      case "newsBody":
+      case "createChat":
+      case "closeChat":
+      case "sendChatMessage":
+      case "getSupportChatMessages":
+      case "updateTaxLot":
+      case "unsubscribe":
+      case "demoAccountSetBalance":
+      case "demoAccountAdjustCash":
+      case "logoff":
         return await this.relayPromise(msg);
       case "addToWatchlist":
       case "removeFromWatchlist":

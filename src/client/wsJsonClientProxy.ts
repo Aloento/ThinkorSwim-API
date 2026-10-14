@@ -7,14 +7,53 @@ import {
   Observable,
 } from "obgen";
 import { ChannelState } from "./realWsJsonClient.js";
+import { AccessTokenGetRequestParams } from "./services/accessTokenGetMessageHandler.js";
+import { AuthCodeGetRequestParams } from "./services/authCodeGetMessageHandler.js";
+import {
+  ChatCloseRequestParams,
+  ChatCreateRequestParams,
+  ChatSendMessageRequestParams,
+  SupportChatMessagesRequestParams,
+} from "./services/supportChatMessageHandlers.js";
 import { ChartRequestParams } from "./services/chartMessageHandler.js";
 import { CreateAlertRequestParams } from "./services/createAlertMessageHandler.js";
+import {
+  DemoAccountAdjustCashRequestParams,
+  DemoAccountSetBalanceRequestParams,
+} from "./services/demoAccountMessageHandlers.js";
+import {
+  DrawingCreateRequestParams,
+  DrawingDeleteRequestParams,
+  DrawingSetCreateRequestParams,
+  DrawingSetDeleteRequestParams,
+  DrawingUpdateRequestParams,
+} from "./services/drawingMessageHandlers.js";
+import {
+  DrawingsRequestParams,
+  DrawingSetsRequestParams,
+} from "./services/drawingSetsMessageHandlers.js";
+import { FundamentalsHistoryRequestParams } from "./services/fundamentalsHistoryMessageHandler.js";
+import { LogoffSchwabRequestParams } from "./services/logoffSchwabMessageHandler.js";
 import { RawLoginResponseBody } from "./services/loginMessageHandler.js";
 import { MarketHoursRequestParams } from "./services/marketHoursMessageHandler.js";
+import {
+  NewsBodyRequestParams,
+  NewsHeadersSubscribeRelevantRequestParams,
+} from "./services/newsBodyMessageHandlers.js";
+import { NewsHeadersGetRelevantRequestParams } from "./services/newsHeadersGetRelevantMessageHandler.js";
+import { NewsHeadersSubscribeRequestParams } from "./services/newsHeadersSubscribeMessageHandler.js";
 import { OptionChainDetailsRequest } from "./services/optionChainDetailsMessageHandler.js";
 import { OptionQuotesRequestParams } from "./services/optionQuotesMessageHandler.js";
 import { PlaceLimitOrderRequestParams } from "./services/placeOrderMessageHandler.js";
+import { QuotesGetRequestParams } from "./services/quotesGetMessageHandler.js";
+import { ScanFilterGetRequestParams } from "./services/scanFilterGetMessageHandler.js";
+import { ScanFilterParametersRequestParams } from "./services/scanFilterParametersMessageHandler.js";
+import { ScanQueryGetRequestParams } from "./services/scanQueryGetMessageHandler.js";
+import { ScanQuerySaveRequestParams } from "./services/scanQuerySaveMessageHandler.js";
+import { StudySubscribeRequestParams } from "./services/studySubscribeMessageHandler.js";
 import { ReplaceOrderRequestParams } from "./services/submitOrderMessageHandler.js";
+import { TaxLotUpdateRequestParams } from "./services/taxLotUpdateMessageHandler.js";
+import { UnsubscribeRequestParams } from "./services/unsubscribeMessageHandler.js";
 import { WatchlistCategoriesRequestParams } from "./services/watchlistCategoriesMessageHandler.js";
 import { WatchlistCreateRequestParams } from "./services/watchlistCreateMessageHandler.js";
 import { WatchlistRenameRequestParams } from "./services/watchlistRenameMessageHandler.js";
@@ -64,6 +103,39 @@ export const ALL_REQUESTS = [
   "addToWatchlist",
   "removeFromWatchlist",
   "rearrangeWatchlist",
+  // ---- 第四批（task-9）：全部单对象参数，wire 上 args 即参数本体，
+  // 无需 relaySpread（lead 建议：新门面方法尽量单对象参数）----
+  "getStudyCategories",
+  "subscribeStudies",
+  "getScanFilters",
+  "getScanFilterParameters",
+  "getScanQuery",
+  "saveScanQuery",
+  "getQuotes",
+  "getFundamentalsHistory",
+  "getAccessToken",
+  "getAuthCode",
+  "getAnalystReportsToken",
+  "createDrawing",
+  "updateDrawing",
+  "deleteDrawing",
+  "createDrawingSet",
+  "deleteDrawingSet",
+  "getDrawingSets",
+  "getDrawings",
+  "getRelevantNews",
+  "subscribeNews",
+  "subscribeRelevantNews",
+  "newsBody",
+  "createChat",
+  "closeChat",
+  "sendChatMessage",
+  "getSupportChatMessages",
+  "updateTaxLot",
+  "unsubscribe",
+  "demoAccountSetBalance",
+  "demoAccountAdjustCash",
+  "logoff",
 ] as const;
 type RequestType = typeof ALL_REQUESTS;
 export type Request = RequestType[number];
@@ -414,6 +486,258 @@ export class WsJsonClientProxy implements WsJsonClient {
       watchlistId,
       symbols,
     }).promise();
+  }
+
+  // ---- 第四批透传（task-9）：全部单对象参数（或零参），直接 dispatch ----
+
+  getStudyCategories(): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>("getStudyCategories").promise();
+  }
+
+  subscribeStudies(
+    request: StudySubscribeRequestParams,
+  ): AsyncIterable<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "subscribeStudies",
+      request,
+    ).iterable();
+  }
+
+  getScanFilters(
+    request?: ScanFilterGetRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "getScanFilters",
+      request,
+    ).promise();
+  }
+
+  getScanFilterParameters(
+    request: ScanFilterParametersRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "getScanFilterParameters",
+      request,
+    ).promise();
+  }
+
+  getScanQuery(
+    request: ScanQueryGetRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "getScanQuery",
+      request,
+    ).promise();
+  }
+
+  saveScanQuery(
+    request: ScanQuerySaveRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "saveScanQuery",
+      request,
+    ).promise();
+  }
+
+  getQuotes(request: QuotesGetRequestParams): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>("getQuotes", request).promise();
+  }
+
+  getFundamentalsHistory(
+    request: FundamentalsHistoryRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "getFundamentalsHistory",
+      request,
+    ).promise();
+  }
+
+  getAccessToken(
+    request: AccessTokenGetRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "getAccessToken",
+      request,
+    ).promise();
+  }
+
+  getAuthCode(
+    request: AuthCodeGetRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "getAuthCode",
+      request,
+    ).promise();
+  }
+
+  getAnalystReportsToken(): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "getAnalystReportsToken",
+    ).promise();
+  }
+
+  createDrawing(
+    request: DrawingCreateRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "createDrawing",
+      request,
+    ).promise();
+  }
+
+  updateDrawing(
+    request: DrawingUpdateRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "updateDrawing",
+      request,
+    ).promise();
+  }
+
+  deleteDrawing(
+    request: DrawingDeleteRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "deleteDrawing",
+      request,
+    ).promise();
+  }
+
+  createDrawingSet(
+    request: DrawingSetCreateRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "createDrawingSet",
+      request,
+    ).promise();
+  }
+
+  deleteDrawingSet(
+    request: DrawingSetDeleteRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "deleteDrawingSet",
+      request,
+    ).promise();
+  }
+
+  getDrawingSets(
+    request: DrawingSetsRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "getDrawingSets",
+      request,
+    ).promise();
+  }
+
+  getDrawings(request: DrawingsRequestParams): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "getDrawings",
+      request,
+    ).promise();
+  }
+
+  getRelevantNews(
+    request: NewsHeadersGetRelevantRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "getRelevantNews",
+      request,
+    ).promise();
+  }
+
+  subscribeNews(
+    request: NewsHeadersSubscribeRequestParams,
+  ): AsyncIterable<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "subscribeNews",
+      request,
+    ).iterable();
+  }
+
+  subscribeRelevantNews(
+    request: NewsHeadersSubscribeRelevantRequestParams,
+  ): AsyncIterable<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "subscribeRelevantNews",
+      request,
+    ).iterable();
+  }
+
+  newsBody(request: NewsBodyRequestParams): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>("newsBody", request).promise();
+  }
+
+  createChat(request: ChatCreateRequestParams): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "createChat",
+      request,
+    ).promise();
+  }
+
+  closeChat(request: ChatCloseRequestParams): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>("closeChat", request).promise();
+  }
+
+  sendChatMessage(
+    request: ChatSendMessageRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "sendChatMessage",
+      request,
+    ).promise();
+  }
+
+  getSupportChatMessages(
+    request: SupportChatMessagesRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "getSupportChatMessages",
+      request,
+    ).promise();
+  }
+
+  updateTaxLot(
+    request: TaxLotUpdateRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "updateTaxLot",
+      request,
+    ).promise();
+  }
+
+  unsubscribe(
+    request: UnsubscribeRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "unsubscribe",
+      request,
+    ).promise();
+  }
+
+  /** ⚠️ 危险操作透传，见 WsJsonClient 接口注释。 */
+  demoAccountSetBalance(
+    request: DemoAccountSetBalanceRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "demoAccountSetBalance",
+      request,
+    ).promise();
+  }
+
+  /** ⚠️ 危险操作透传，见 WsJsonClient 接口注释。 */
+  demoAccountAdjustCash(
+    request: DemoAccountAdjustCashRequestParams,
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>(
+      "demoAccountAdjustCash",
+      request,
+    ).promise();
+  }
+
+  /** ⚠️ 危险操作透传，见 WsJsonClient 接口注释。 */
+  logoff(request: LogoffSchwabRequestParams): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>("logoff", request).promise();
   }
 
   workingOrders(accountNumber: string): AsyncIterable<ParsedPayloadResponse> {

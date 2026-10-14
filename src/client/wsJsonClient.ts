@@ -1,15 +1,54 @@
 import { Disposable } from "../server/disposable.js";
+import { AccessTokenGetRequestParams } from "./services/accessTokenGetMessageHandler.js";
+import { AuthCodeGetRequestParams } from "./services/authCodeGetMessageHandler.js";
+import {
+  ChatCloseRequestParams,
+  ChatCreateRequestParams,
+  ChatSendMessageRequestParams,
+  SupportChatMessagesRequestParams,
+} from "./services/supportChatMessageHandlers.js";
 import { ChartRequestParams } from "./services/chartMessageHandler.js";
 import { CreateAlertRequestParams } from "./services/createAlertMessageHandler.js";
+import {
+  DemoAccountAdjustCashRequestParams,
+  DemoAccountSetBalanceRequestParams,
+} from "./services/demoAccountMessageHandlers.js";
+import {
+  DrawingCreateRequestParams,
+  DrawingDeleteRequestParams,
+  DrawingSetCreateRequestParams,
+  DrawingSetDeleteRequestParams,
+  DrawingUpdateRequestParams,
+} from "./services/drawingMessageHandlers.js";
+import {
+  DrawingsRequestParams,
+  DrawingSetsRequestParams,
+} from "./services/drawingSetsMessageHandlers.js";
+import { FundamentalsHistoryRequestParams } from "./services/fundamentalsHistoryMessageHandler.js";
+import { LogoffSchwabRequestParams } from "./services/logoffSchwabMessageHandler.js";
 import { RawLoginResponseBody } from "./services/loginMessageHandler.js";
 import { MarketHoursRequestParams } from "./services/marketHoursMessageHandler.js";
+import {
+  NewsBodyRequestParams,
+  NewsHeadersSubscribeRelevantRequestParams,
+} from "./services/newsBodyMessageHandlers.js";
+import { NewsHeadersGetRelevantRequestParams } from "./services/newsHeadersGetRelevantMessageHandler.js";
+import { NewsHeadersSubscribeRequestParams } from "./services/newsHeadersSubscribeMessageHandler.js";
 import { OptionChainDetailsRequest } from "./services/optionChainDetailsMessageHandler.js";
 import { OptionQuotesRequestParams } from "./services/optionQuotesMessageHandler.js";
 import { PlaceLimitOrderRequestParams } from "./services/placeOrderMessageHandler.js";
+import { QuotesGetRequestParams } from "./services/quotesGetMessageHandler.js";
+import { ScanFilterGetRequestParams } from "./services/scanFilterGetMessageHandler.js";
+import { ScanFilterParametersRequestParams } from "./services/scanFilterParametersMessageHandler.js";
+import { ScanQueryGetRequestParams } from "./services/scanQueryGetMessageHandler.js";
+import { ScanQuerySaveRequestParams } from "./services/scanQuerySaveMessageHandler.js";
+import { StudySubscribeRequestParams } from "./services/studySubscribeMessageHandler.js";
 import {
-  SubmitDraftOrderRequestParams,
   ReplaceOrderRequestParams,
+  SubmitDraftOrderRequestParams,
 } from "./services/submitOrderMessageHandler.js";
+import { TaxLotUpdateRequestParams } from "./services/taxLotUpdateMessageHandler.js";
+import { UnsubscribeRequestParams } from "./services/unsubscribeMessageHandler.js";
 import { WatchlistCategoriesRequestParams } from "./services/watchlistCategoriesMessageHandler.js";
 import { WatchlistCreateRequestParams } from "./services/watchlistCreateMessageHandler.js";
 import { WatchlistRenameRequestParams } from "./services/watchlistRenameMessageHandler.js";
@@ -158,4 +197,146 @@ export interface WsJsonClient extends Disposable {
     watchlistId: number,
     symbols: string[],
   ): Promise<ParsedPayloadResponse>;
+
+  // ---- 第四批（agent/07 §"第四批接入契约"，task-8 handler 全量接入）----
+  // 一次性 Promise 型走 dispatchOneShot（task-6 语义：断线 reject 不重放）。
+
+  /** study/categories：研究指标目录（26 分类/441 研究，实测成功帧） */
+  getStudyCategories(): Promise<ParsedPayloadResponse>;
+
+  /** study/subscribe：指标数值推送流（guest 权限受限，参数按校验帧） */
+  subscribeStudies(
+    request: StudySubscribeRequestParams,
+  ): AsyncIterable<ParsedPayloadResponse>;
+
+  /** scan_filter/get：screener 筛选器目录（实测成功帧） */
+  getScanFilters(
+    request?: ScanFilterGetRequestParams,
+  ): Promise<ParsedPayloadResponse>;
+
+  /** scan_filter/parameters：筛选器参数定义（guest 空响应） */
+  getScanFilterParameters(
+    request: ScanFilterParametersRequestParams,
+  ): Promise<ParsedPayloadResponse>;
+
+  /** scan_query/get：screener 查询（guest 受限） */
+  getScanQuery(
+    request: ScanQueryGetRequestParams,
+  ): Promise<ParsedPayloadResponse>;
+
+  /** scan_query/save：保存 screener 查询（bundle 证据） */
+  saveScanQuery(
+    request: ScanQuerySaveRequestParams,
+  ): Promise<ParsedPayloadResponse>;
+
+  /** quotes/get：一次性报价快照（不建立持续订阅；实测成功帧） */
+  getQuotes(request: QuotesGetRequestParams): Promise<ParsedPayloadResponse>;
+
+  /** fundamentals/history：历史基本面序列（guest 校验帧未过，待真实账户） */
+  getFundamentalsHistory(
+    request: FundamentalsHistoryRequestParams,
+  ): Promise<ParsedPayloadResponse>;
+
+  /** access_token/get：refreshToken 换 accessToken（token 续期，wsjson 通道） */
+  getAccessToken(
+    request: AccessTokenGetRequestParams,
+  ): Promise<ParsedPayloadResponse>;
+
+  /** auth_code/get：refreshToken 换一次性 auth code（bundle 证据） */
+  getAuthCode(
+    request: AuthCodeGetRequestParams,
+  ): Promise<ParsedPayloadResponse>;
+
+  /** analyst_reports/token：分析师报告第三方访问 token（实测成功帧） */
+  getAnalystReportsToken(): Promise<ParsedPayloadResponse>;
+
+  createDrawing(
+    request: DrawingCreateRequestParams,
+  ): Promise<ParsedPayloadResponse>;
+
+  updateDrawing(
+    request: DrawingUpdateRequestParams,
+  ): Promise<ParsedPayloadResponse>;
+
+  deleteDrawing(
+    request: DrawingDeleteRequestParams,
+  ): Promise<ParsedPayloadResponse>;
+
+  createDrawingSet(
+    request: DrawingSetCreateRequestParams,
+  ): Promise<ParsedPayloadResponse>;
+
+  deleteDrawingSet(
+    request: DrawingSetDeleteRequestParams,
+  ): Promise<ParsedPayloadResponse>;
+
+  getDrawingSets(
+    request: DrawingSetsRequestParams,
+  ): Promise<ParsedPayloadResponse>;
+
+  getDrawings(request: DrawingsRequestParams): Promise<ParsedPayloadResponse>;
+
+  /** news_headers/get_relevant：相关度新闻（guest 权限受限） */
+  getRelevantNews(
+    request: NewsHeadersGetRelevantRequestParams,
+  ): Promise<ParsedPayloadResponse>;
+
+  /** news_headers/subscribe：新闻标题推送流（bundle 证据，未实测） */
+  subscribeNews(
+    request: NewsHeadersSubscribeRequestParams,
+  ): AsyncIterable<ParsedPayloadResponse>;
+
+  /** news_headers/subscribe_relevant：相关度新闻推送流（guest 权限受限） */
+  subscribeRelevantNews(
+    request: NewsHeadersSubscribeRelevantRequestParams,
+  ): AsyncIterable<ParsedPayloadResponse>;
+
+  newsBody(request: NewsBodyRequestParams): Promise<ParsedPayloadResponse>;
+
+  createChat(request: ChatCreateRequestParams): Promise<ParsedPayloadResponse>;
+
+  closeChat(request: ChatCloseRequestParams): Promise<ParsedPayloadResponse>;
+
+  sendChatMessage(
+    request: ChatSendMessageRequestParams,
+  ): Promise<ParsedPayloadResponse>;
+
+  getSupportChatMessages(
+    request: SupportChatMessagesRequestParams,
+  ): Promise<ParsedPayloadResponse>;
+
+  /** tax_lot/update：税批选择更新（bundle 证据，未实测） */
+  updateTaxLot(
+    request: TaxLotUpdateRequestParams,
+  ): Promise<ParsedPayloadResponse>;
+
+  /** unsubscribe：取消订阅（资源清理，实测线上帧） */
+  unsubscribe(
+    request: UnsubscribeRequestParams,
+  ): Promise<ParsedPayloadResponse>;
+
+  /**
+   * ⚠️ demo_account/set_balance：重置模拟盘余额——破坏性资金操作，
+   * 成功帧 guest 未实测；绝不要在共享/真实账户会话上冒烟调用。
+   * @deprecated 危险操作：仅在自建 demo 账户上显式使用。
+   */
+  demoAccountSetBalance(
+    request: DemoAccountSetBalanceRequestParams,
+  ): Promise<ParsedPayloadResponse>;
+
+  /**
+   * ⚠️ demo_account/adjust_cash：模拟盘现金划转——破坏性资金操作；
+   * 绝不要在共享/真实账户会话上冒烟调用。
+   * @deprecated 危险操作：仅在自建 demo 账户上显式使用。
+   */
+  demoAccountAdjustCash(
+    request: DemoAccountAdjustCashRequestParams,
+  ): Promise<ParsedPayloadResponse>;
+
+  /**
+   * ⚠️ logoff/schwab：终止服务端 Schwab 会话——调用后当前 accessToken 失效，
+   * 需完整重认证。绝不要在冒烟里调用。
+   * @deprecated 危险操作：终结会话，仅显式登出时使用。
+   */
+  logoff(request: LogoffSchwabRequestParams): Promise<ParsedPayloadResponse>;
 }
