@@ -81,7 +81,7 @@ async function main() {
     await cdp.send("Network.enable").catch(() => {});
     cdp.on("Network.webSocketFrameReceived", (ev) => {
       try {
-        const t = ev.response?.payload;
+        const t = ev.response?.payloadData;
         if (!t || !t.includes("accessTokenInfo") || !t.includes("refreshToken"))
           return;
         const msg = JSON.parse(t);
