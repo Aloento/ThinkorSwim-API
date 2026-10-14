@@ -38,6 +38,15 @@ node --env-file=.env dist/example/testApp.js
 node --env-file=.env dist/example/wsProxyServer.js
 ```
 
+> **本地代理安全（S1/S3）**：`WsJsonServerProxy` 默认无鉴权——本机任意进程
+> 都能操控它代理的交易会话。设置环境变量 `TOS_PROXY_TOKEN` 后，每条代理
+> 消息必须携带该 token（`WsJsonClientProxy` 构造第三参传 `{ authToken }`
+> 自动附带，`wsProxyClient` 读同名 env），不匹配即回
+> `{"error":"unauthorized"}` 并断开；未设置保持旧行为（信任本机）。
+> 未知 `request` 一律回 `{"error":"unknown request"}`（ALL_REQUESTS 白名单，
+> 此前静默挂起），非法 JSON 回 `{"error":"invalid json"}`（此前
+> unhandled rejection）。多用户机器与任何非纯本机回环场景**必须**设置 token。
+
 # 认证流程（2026-10 线上实测，见 `agent/06-黑盒实测发现.md`）
 
 1. **账密 → authCode**：登录 `https://trade.thinkorswim.com/guestpass`（或真实入口）后，
