@@ -61,6 +61,9 @@ export const ALL_REQUESTS = [
   "createWatchlist",
   "renameWatchlist",
   "deleteWatchlist",
+  "addToWatchlist",
+  "removeFromWatchlist",
+  "rearrangeWatchlist",
 ] as const;
 type RequestType = typeof ALL_REQUESTS;
 export type Request = RequestType[number];
@@ -379,6 +382,38 @@ export class WsJsonClientProxy implements WsJsonClient {
       "deleteWatchlist",
       watchlistId,
     ).promise();
+  }
+
+  // 双位置参数的方法在 wire 上以 {watchlistId, symbols} 对象传输，
+  // 服务端（WsJsonServerProxy）解包回两个实参。
+  addToWatchlist(
+    watchlistId: number,
+    symbols: string[],
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>("addToWatchlist", {
+      watchlistId,
+      symbols,
+    }).promise();
+  }
+
+  removeFromWatchlist(
+    watchlistId: number,
+    symbols: string[],
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>("removeFromWatchlist", {
+      watchlistId,
+      symbols,
+    }).promise();
+  }
+
+  rearrangeWatchlist(
+    watchlistId: number,
+    symbols: string[],
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatch<ParsedPayloadResponse>("rearrangeWatchlist", {
+      watchlistId,
+      symbols,
+    }).promise();
   }
 
   workingOrders(accountNumber: string): AsyncIterable<ParsedPayloadResponse> {

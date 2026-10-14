@@ -34,10 +34,10 @@ console.log(
 const statement = await client.getStatement("COMBINED ACCOUNT");
 console.log("[smoke] statement NET_LIQ:", statement.body.values?.NET_LIQ);
 
-const mh = await client.getMarketHours(
-  ["EQUITY"],
-  new Date().toISOString().slice(0, 10),
-);
+const mh = await client.getMarketHours({
+  markets: ["EQUITY"],
+  date: new Date().toISOString().slice(0, 10),
+});
 console.log(
   "[smoke] market_hours EQUITY isOpen:",
   mh.body.schwabMarketHours?.EQUITY?.EQ?.isOpen,
@@ -54,7 +54,7 @@ for await (const q of quotes) {
   break; // 第一帧即可
 }
 
-const cats = await client.getWatchlists(["PUBLIC"]);
+const cats = await client.getWatchlists({ categories: ["PUBLIC"] });
 const wl = cats.body.categories?.[0]?.watchlists?.[0];
 console.log(
   "[smoke] watchlists:",
@@ -69,6 +69,45 @@ if (wl) {
     "symbols=",
     one.body.watchlist?.symbols?.length,
   );
+}
+
+// watchlist 成分写闭环：create → add → remove → rearrange → delete
+// （写用例实测见 agent/artifacts/write-2026-10-13/W5f.jsonl；watchlistId
+// 必须用 create 响应返回的真实 id）。
+const wlName = `SmokeWL-${Date.now()}`;
+const created = await client.createWatchlist({
+  watchlistName: wlName,
+  symbols: ["AAPL"],
+});
+const createdId = created.body.watchlist?.id;
+console.log("[smoke] watchlist/create:", wlName, "id=", createdId);
+if (!createdId) {
+  console.error("[smoke] FAIL: create returned no watchlist id");
+  process.exit(1);
+}
+try {
+  const added = await client.addToWatchlist(createdId, ["SPY", "TSLA"]);
+  console.log(
+    "[smoke] watchlist/add:",
+    "symbols=",
+    JSON.stringify(added.body.watchlist?.symbols),
+  );
+  const removed = await client.removeFromWatchlist(createdId, ["TSLA"]);
+  console.log(
+    "[smoke] watchlist/remove:",
+    "symbols=",
+    JSON.stringify(removed.body.watchlist?.symbols),
+  );
+  await client.rearrangeWatchlist(createdId, ["SPY", "AAPL"]);
+  const after = await client.watchlist(createdId);
+  console.log(
+    "[smoke] watchlist/rearrange verified:",
+    JSON.stringify(after.body.watchlist?.symbols),
+  );
+} finally {
+  // 闭环收尾：无论中间步骤成败都删掉临时 watchlist
+  const del = await client.deleteWatchlist(createdId);
+  console.log("[smoke] watchlist/delete:", del.service, "ok");
 }
 
 client.disconnect();

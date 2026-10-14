@@ -140,4 +140,22 @@ export interface WsJsonClient extends Disposable {
   ): Promise<ParsedPayloadResponse>;
 
   deleteWatchlist(watchlistId: number): Promise<ParsedPayloadResponse>;
+
+  /** watchlist/add：响应为合并后的完整 watchlist（W5f 实测） */
+  addToWatchlist(
+    watchlistId: number,
+    symbols: string[],
+  ): Promise<ParsedPayloadResponse>;
+
+  /** watchlist/remove：响应为删除成分后的完整 watchlist（W5f 实测） */
+  removeFromWatchlist(
+    watchlistId: number,
+    symbols: string[],
+  ): Promise<ParsedPayloadResponse>;
+
+  /** watchlist/rearrange：symbols 为新顺序，响应为空对象（W5f 实测） */
+  rearrangeWatchlist(
+    watchlistId: number,
+    symbols: string[],
+  ): Promise<ParsedPayloadResponse>;
 }

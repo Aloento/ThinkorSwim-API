@@ -60,6 +60,7 @@ import SubmitOrderMessageHandler, {
 } from "./services/submitOrderMessageHandler.js";
 import SubscribeToAlertMessageHandler from "./services/subscribeToAlertMessageHandler.js";
 import UserPropertiesMessageHandler from "./services/userPropertiesMessageHandler.js";
+import WatchlistAddMessageHandler from "./services/watchlistAddMessageHandler.js";
 import WatchlistCategoriesMessageHandler, {
   WatchlistCategoriesRequestParams,
 } from "./services/watchlistCategoriesMessageHandler.js";
@@ -67,9 +68,11 @@ import WatchlistCreateMessageHandler, {
   WatchlistCreateRequestParams,
 } from "./services/watchlistCreateMessageHandler.js";
 import WatchlistDeleteMessageHandler from "./services/watchlistDeleteMessageHandler.js";
+import WatchlistRemoveMessageHandler from "./services/watchlistRemoveMessageHandler.js";
 import WatchlistRenameMessageHandler, {
   WatchlistRenameRequestParams,
 } from "./services/watchlistRenameMessageHandler.js";
+import WatchlistRearrangeMessageHandler from "./services/watchlistRearrangeMessageHandler.js";
 import WebSocketApiMessageHandler from "./services/webSocketApiMessageHandler.js";
 import WorkingOrdersMessageHandler from "./services/workingOrdersMessageHandler.js";
 import {
@@ -139,6 +142,9 @@ const messageHandlers: WebSocketApiMessageHandler<never>[] = [
   new WatchlistCreateMessageHandler(),
   new WatchlistRenameMessageHandler(),
   new WatchlistDeleteMessageHandler(),
+  new WatchlistAddMessageHandler(),
+  new WatchlistRemoveMessageHandler(),
+  new WatchlistRearrangeMessageHandler(),
 ];
 
 export const DEFAULT_WS_URL =
@@ -874,6 +880,38 @@ export class RealWsJsonClient implements WsJsonClient {
 
   deleteWatchlist(watchlistId: number): Promise<ParsedPayloadResponse> {
     return this.dispatchOneShot(WatchlistDeleteMessageHandler, watchlistId);
+  }
+
+  addToWatchlist(
+    watchlistId: number,
+    symbols: string[],
+  ): Promise<ParsedPayloadResponse> {
+    // 服务端忽略已存在的符号，响应返回合并后列表（W5f）。
+    return this.dispatchOneShot(WatchlistAddMessageHandler, {
+      watchlistId,
+      symbols,
+    });
+  }
+
+  removeFromWatchlist(
+    watchlistId: number,
+    symbols: string[],
+  ): Promise<ParsedPayloadResponse> {
+    return this.dispatchOneShot(WatchlistRemoveMessageHandler, {
+      watchlistId,
+      symbols,
+    });
+  }
+
+  rearrangeWatchlist(
+    watchlistId: number,
+    symbols: string[],
+  ): Promise<ParsedPayloadResponse> {
+    // symbols 为新顺序；生效验证走 watchlist/get（W5f 实测）。
+    return this.dispatchOneShot(WatchlistRearrangeMessageHandler, {
+      watchlistId,
+      symbols,
+    });
   }
 
   userProperties(): Promise<ParsedPayloadResponse> {

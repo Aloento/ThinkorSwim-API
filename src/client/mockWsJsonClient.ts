@@ -318,4 +318,50 @@ export default class MockWsJsonClient implements WsJsonClient {
       body: {},
     });
   }
+
+  addToWatchlist(
+    watchlistId: number,
+    symbols: string[],
+  ): Promise<ParsedPayloadResponse> {
+    // 线上一致：响应为合并后的完整 watchlist（fixture 直接回传入参）。
+    return Promise.resolve({
+      service: "watchlist/add",
+      body: {
+        watchlist: {
+          id: watchlistId,
+          name: "foo",
+          type: "STATIC",
+          symbols,
+        },
+      },
+    });
+  }
+
+  removeFromWatchlist(
+    watchlistId: number,
+    symbols: string[],
+  ): Promise<ParsedPayloadResponse> {
+    return Promise.resolve({
+      service: "watchlist/remove",
+      body: {
+        watchlist: {
+          id: watchlistId,
+          name: "foo",
+          type: "STATIC",
+          symbols,
+        },
+      },
+    });
+  }
+
+  rearrangeWatchlist(
+    _watchlistId: number,
+    _symbols: string[],
+  ): Promise<ParsedPayloadResponse> {
+    // 线上新顺序生效走 watchlist/get 验证，add 响应为空对象（W5f）。
+    return Promise.resolve({
+      service: "watchlist/rearrange",
+      body: {},
+    });
+  }
 }

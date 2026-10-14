@@ -77,6 +77,12 @@ export default class WsJsonServerProxy implements Disposable {
       case "deleteWatchlist":
       case "reconnect":
         return await this.relayPromise(msg);
+      case "addToWatchlist":
+      case "removeFromWatchlist":
+      case "rearrangeWatchlist":
+        // 双位置参数在 wire 上打包为 {watchlistId, symbols}（见
+        // WsJsonClientProxy 对应方法），这里解包回 (watchlistId, symbols)。
+        return await this.relaySpread(msg);
       case "disconnect":
         return this.upstream!.disconnect();
     }
@@ -89,7 +95,33 @@ export default class WsJsonServerProxy implements Disposable {
   private async relayPromise({ request, args }: ProxiedRequest) {
     const upstream = this.ensureConnected();
     try {
-      const response = await upstream[request](args as never);
+      // 单参方法专用分发；双参方法（addToWatchlist 等）走 relaySpread。
+      const response = await (
+        upstream[request] as (args: never) => Promise<unknown>
+      ).call(upstream, args as never);
+      this.proxyResponse({ request, args, response });
+    } catch (e) {
+      this.proxyResponse({ request, args, response: e });
+    }
+  }
+
+  /**
+   * 双位置参数方法（addToWatchlist 等）：wire 上 args 为
+   * {watchlistId, symbols}，解包为 (watchlistId, symbols) 调用。
+   */
+  private async relaySpread({ request, args }: ProxiedRequest) {
+    const upstream = this.ensureConnected();
+    const { watchlistId, symbols } = args as {
+      watchlistId: number;
+      symbols: string[];
+    };
+    try {
+      const response = await (
+        upstream[request] as (
+          watchlistId: number,
+          symbols: string[],
+        ) => Promise<unknown>
+      ).call(upstream, watchlistId, symbols);
       this.proxyResponse({ request, args, response });
     } catch (e) {
       this.proxyResponse({ request, args, response: e });
@@ -98,9 +130,10 @@ export default class WsJsonServerProxy implements Disposable {
 
   private async relayIterable({ request, args }: ProxiedRequest) {
     const upstream = this.ensureConnected();
-    for await (const response of upstream[request](
-      args as never,
-    ) as AsyncIterable<any>) {
+    const iterable = (
+      upstream[request] as (args: never) => AsyncIterable<unknown>
+    ).call(upstream, args as never);
+    for await (const response of iterable) {
       this.proxyResponse({ request, args, response });
     }
   }
