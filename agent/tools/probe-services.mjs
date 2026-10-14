@@ -396,10 +396,10 @@ const PROBES = [
   {
     service: "fundamentals/history",
     id: "probe-fund-hist",
+    // 实测（fund-hist-findings.md）：无 time 参数；fields 只收 21 个 historical 字段
     params: {
       symbol: "AAPL",
-      time: "QUARTERLY",
-      fields: ["REVENUE", "NET_INCOME"],
+      fields: ["EARNINGS_PER_SHARE_TTM", "SALES_PER_SHARE"],
     },
     waitMs: 4000,
   },
@@ -590,10 +590,10 @@ const PROBES = [
   {
     service: "fundamentals/history",
     id: "probe-fund-hist4",
+    // 同上：无 time；historical 字段子集
     params: {
       symbol: "AAPL",
-      time: "QUARTERLY",
-      fields: ["REVENUE", "NET_INCOME"],
+      fields: ["RETURN_ON_EQUITY"],
     },
     waitMs: 4000,
   },
