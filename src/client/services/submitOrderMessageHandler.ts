@@ -1,14 +1,21 @@
 import { RawPayloadRequest } from "../tdaWsJsonTypes.js";
 import { ApiService } from "./apiService.js";
-import { PlaceLimitOrderRequestParams } from "./placeOrderMessageHandler.js";
+import {
+  buildPlaceOrderEntry,
+  PlaceOrderRequestParams,
+} from "./placeOrderMessageHandler.js";
 import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-export type SubmitDraftOrderRequestParams = PlaceLimitOrderRequestParams;
+export type SubmitDraftOrderRequestParams = PlaceOrderRequestParams;
 
 // 改单：refOrderId 必填（区别于提交草稿的新单）。
-export type ReplaceOrderRequestParams = Required<PlaceLimitOrderRequestParams>;
+// 注意不要用 Required<PlaceOrderRequestParams>——Required 对判别联合的
+// `limitPrice?: never` 会变成必填 never（不可构造），改为交集收紧 refOrderId。
+export type ReplaceOrderRequestParams = PlaceOrderRequestParams & {
+  refOrderId: number;
+};
 
 // 提交订单草稿（新单）或修改已存在的订单（带 refOrderId）。
 //
@@ -21,17 +28,13 @@ export type ReplaceOrderRequestParams = Required<PlaceLimitOrderRequestParams>;
 // - 改单（W3）：action=SUBMIT ver=0，header.id 是新造的
 //   edit-order-<SYMBOL>（编辑不是草稿续写，不要求复用下单草稿 id），
 //   订单条目 requestType=EDIT_ORDER 且携带 refOrderId。
-// ReqType 用 refOrderId 可选的 PlaceLimitOrderRequestParams：新单（submitOrder，
-// refOrderId 省略）与改单（replaceOrder，refOrderId 必填，Required<X> 可赋值给
-// X）共用本 handler，内部按 refOrderId 是否给出分支。
-export default class SubmitOrderMessageHandler implements WebSocketApiMessageHandler<PlaceLimitOrderRequestParams> {
-  buildRequest({
-    accountNumber,
-    limitPrice,
-    symbol,
-    quantity,
-    refOrderId,
-  }: PlaceLimitOrderRequestParams): RawPayloadRequest {
+// orderType/limitPrice/stopPrice/tif 与 CONFIRM 共用 buildPlaceOrderEntry
+// （MARKET/STOP/STOP_LIMIT 扩展，task-10）；SUBMIT 缺省 tif=DAY +
+// tag=TOSWeb（W2 实测形状）。
+// ⚠️ MARKET 单 SUBMIT 会立即成交——下单前确认。
+export default class SubmitOrderMessageHandler implements WebSocketApiMessageHandler<PlaceOrderRequestParams> {
+  buildRequest(params: PlaceOrderRequestParams): RawPayloadRequest {
+    const { symbol, refOrderId } = params;
     const isEdit = refOrderId !== undefined;
     return newPayload({
       header: {
@@ -40,19 +43,14 @@ export default class SubmitOrderMessageHandler implements WebSocketApiMessageHan
         ver: 0,
       },
       params: {
-        accountCode: accountNumber,
+        accountCode: params.accountNumber,
         action: "SUBMIT",
         marker: "SINGLE",
         orders: [
-          {
-            requestType: isEdit ? "EDIT_ORDER" : "INIT_STOCK",
-            ...(isEdit ? { refOrderId } : {}),
-            orderType: "LIMIT",
-            tif: "DAY",
-            limitPrice,
-            legs: [{ symbol, quantity }],
+          buildPlaceOrderEntry(params, isEdit ? "EDIT_ORDER" : "INIT_STOCK", {
+            defaultTif: "DAY",
             tag: "TOSWeb",
-          },
+          }),
         ],
       },
     });
