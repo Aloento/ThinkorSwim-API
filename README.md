@@ -80,8 +80,10 @@ node --env-file=.env dist/example/wsProxyServer.js
 
 - 部分服务（news/relevant、screener、study/subscribe、tax_lot 深查、fundamentals/history）
   对 guest 账号权限受限，已在真实账户范围外标注；库 API 仍提供，成功帧待真实账户确认。
-- token 自动续期（Authenticator）已具备 `access_token/get` 通道；guest 无 refreshToken，
-  端到端续期回归需真实账户。
+- token 自动续期：`Authenticator`（src/auth/authenticator.ts）已落地——23h 阈值内经
+  `access_token/get` 自动换 token，`onTokenRotated` 回调必须持久化轮换后的新
+  refreshToken（一次性）。guest 无 refreshToken（直通并 warn 一次），端到端续期
+  回归需真实账户。
 - 私有协议，服务器 build 会漂移；`pnpm run ci` 与 `agent/tools/probe-*.mjs` 可随时重新普查
   （注意 pnpm v12 里裸 `pnpm ci` 是 install 别名假绿）。
 
