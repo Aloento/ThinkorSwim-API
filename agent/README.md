@@ -14,8 +14,8 @@
 | [03-问题与风险清单.md](03-问题与风险清单.md)         | 编号化问题清单（R 认证 / P 协议 / T 交易 / A API / S 代理 / E 工程 / X 线上环境），含 **T1：placeOrder 的 promise 永不 resolve** 这类实锤 bug | 排期依据               |
 | [04-黑盒测试方案.md](04-黑盒测试方案.md)             | L0~L5 分层测试、只读普查矩阵、认证生命周期用例（C1-C7）、模拟盘写用例（W1-W7）、安全闸门设计                                                  | 有测试账户后照此执行   |
 | [05-重构计划.md](05-重构计划.md)                     | 阶段 0~5 渐进式重构路线图（止血→认证/重连→协议正确性→交易加固→类型打磨→发布与漂移监测）                                                       | 干活的总纲             |
-| [06-黑盒实测发现.md](06-黑盒实测发现.md)             | **2026-10-13 实测证据**：guestpass 完整认证链、27 项服务普查矩阵（含参数漂移）、W 组写用例（下单/撤单/告警/自选列表）                         | 写代码前查服务真实形状 |
-| [07-集成设计.md](07-集成设计.md)                     | 门面方法清单（全部实测背书）、下单草稿 id 规则（CONFIRM/SUBMIT 必须同 id）、认证入口重构提案                                                  | 做 task-3 集成必读     |
+| [06-黑盒实测发现.md](06-黑盒实测发现.md)             | **2026-10-13 实测证据**：guestpass 完整认证链、60+ 服务五轮普查矩阵（枚举全抄自错误帧）、W 组写用例、guest 权限边界、已知缺陷                 | 写代码前查服务真实形状 |
+| [07-集成设计.md](07-集成设计.md)                     | 门面方法契约（全部实测背书）、下单草稿 id 规则（CONFIRM/SUBMIT 必须同 id）、第四批 31 handler 接入命名约定                                    | 改门面必读             |
 
 ## 工具
 
@@ -28,17 +28,25 @@
 - [tools/probe-write.mjs](tools/probe-write.mjs) — L3 写用例（**硬闸门：只连 papermoney**，$1 限价 1 股白名单标的）：
   `node agent/tools/probe-write.mjs W1|W2|W4|W5|W6|…`
 - [tools/watch-flow2.mjs](tools/watch-flow2.mjs) — CDP 全帧观察器（导航前挂监听，可看前端真实 WS 往返）
+- [tools/smoke-lib.mjs](tools/smoke-lib.mjs) — **端到端冒烟（编译库 API 对真实 paper 服务器）**：
+  登录→accounts→statement→market_hours→quotes→watchlist create/add/remove/rearrange/get/delete 闭环。
+  `node agent/tools/smoke-lib.mjs`（需先 build 且 `.env.blackbox` 有效）
+- [tools/smoke-order.mjs](tools/smoke-order.mjs) — 库 API 下单冒烟（$1 限价 1 股 + 自动撤单，T1 修复真机验证）
 - [tools/.env.blackbox.example](tools/.env.blackbox.example) — 黑盒凭据模板，复制为
   `.env.blackbox` 填写（已被 gitignore；录制产物目录 `agent/artifacts/` 同样不入库）
 
 ## 一页结论
 
-1. **工程基线健康**：pnpm + Node 26 下 install/build/test/lint 全绿。
+1. **工程基线健康**：pnpm + Node 26 下 install/build/test/lint 全绿（`pnpm run ci` 四关；
+   注意 pnpm v12 里裸 `pnpm ci` 是 install 别名的假绿）。
 2. **guest 认证链已端到端打通**（2026-10-13）：sws-gateway → tsm/authorize →
    **papermoney-services**（token 与数据中心绑定，paper token 连真实 DC 必失败）；
    token 可跨 WS 连接复用，有效期 ~24h。
-3. **只读与写操作全面实测**：27 服务普查 + 下单/撤单/告警/自选列表写闭环；
-   chart/market_hours 参数漂移已修；成分修改类服务不存在（疑走 REST）。
-4. **剩余核心风险**只剩响应路由按 service 不按 id（并发串台 + 下单结果拿不到，
-   队友改造中）与认证生命周期（重连/续期）。
-5. 重构按 05 的六个阶段推进（阶段 0 已完成）；实测细节以 06 为准，集成以 07 为准。
+3. **只读与写操作全面实测**：60+ 服务五轮普查 + 下单/撤单/告警/自选列表写闭环；
+   成分修改实名 `watchlist/add|remove|rearrange`（bundle 挖掘，早期"不存在"结论已推翻）。
+4. **库实现覆盖**：`ApiService` 77 个服务名、50+ handler、四批门面接入；下单两步
+   （CONFIRM/SUBMIT 同草稿 id）、真实线帧回放测试、连接生命周期（重连退避/心跳
+   看门狗/订阅重放）全部落地并在真实服务器上冒烟通过。
+5. **剩余**：news_relevant/study_subscribe/scan_query/fundamentals_history 等对 guest
+   权限受限（真实账户回归）；token 自动续期（Authenticator）待真实 refreshToken 联调。
+6. 重构按 05 的六个阶段推进（阶段 0/2 完成，阶段 1 除续期外完成）；实测细节以 06 为准，集成以 07 为准。
