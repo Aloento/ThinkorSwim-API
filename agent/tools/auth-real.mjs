@@ -38,6 +38,7 @@ const safe = async (fn) => {
 const artDir = join(here, "..", "artifacts");
 mkdirSync(artDir, { recursive: true });
 const captured = []; // 全部 login/authorize 相关响应（脱敏前原样存档）
+let pageRefreshToken = null; // 页面 login/schwab 帧里的 accessTokenInfo.refreshToken
 
 async function main() {
   const browser = await puppeteer.launch({
@@ -73,10 +74,30 @@ async function main() {
           console.log("tsm/authorize 201: keys=%s", Object.keys(tsm).join(","));
       }
     });
-    // 抓 wsjson 帧里的 login/schwab 响应（页面 WS 流量）
+    // 抓 wsjson WS 帧里的 login/schwab 响应（accessTokenInfo.refreshToken
+    // 只在该帧里；token 方式的 login 响应没有——本轮实测证实）
     page.on("wsresponse", () => {});
     const cdp = await page.createCDPSession();
     await cdp.send("Network.enable").catch(() => {});
+    cdp.on("Network.webSocketFrameReceived", (ev) => {
+      try {
+        const t = ev.response?.payload;
+        if (!t || !t.includes("accessTokenInfo") || !t.includes("refreshToken"))
+          return;
+        const msg = JSON.parse(t);
+        for (const e of msg.payload ?? []) {
+          if (e?.body?.accessTokenInfo?.refreshToken && !pageRefreshToken) {
+            pageRefreshToken = e.body.accessTokenInfo.refreshToken;
+            console.log(
+              "[auth-real] captured refreshToken from page login/schwab frame (len=%d)",
+              pageRefreshToken.length,
+            );
+          }
+        }
+      } catch {
+        /* 非 JSON 帧忽略 */
+      }
+    });
 
     console.log("[auth-real] goto https://trade.thinkorswim.com/ ...");
     await page.goto("https://trade.thinkorswim.com/", {
@@ -264,7 +285,9 @@ async function main() {
       );
     }
     console.log("wsjson login OK user=%s", b.userCode);
-    const refreshToken = b.accessTokenInfo?.refreshToken ?? undefined;
+    // 页面 login/schwab 帧（CDP 抓包）优先；直连 login 帧若自带也接受
+    const refreshToken =
+      pageRefreshToken ?? b.accessTokenInfo?.refreshToken ?? undefined;
     console.log("refreshToken present:", refreshToken ? "YES" : "NO");
     ws.close();
 
