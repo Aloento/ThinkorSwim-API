@@ -13,6 +13,7 @@ import {
   isSchwabLoginResponse,
 } from "./messageTypeHelpers.js";
 import ResponseParser from "./responseParser.js";
+import SubscriptionStream from "./subscriptionStream.js";
 // ---- 第四批 handler 与其参数类型（task-8，agent/07 §第四批接入契约）----
 import AccessTokenGetMessageHandler, {
   AccessTokenGetRequestParams,
@@ -288,6 +289,12 @@ export type RealWsJsonClientOptions = {
   reconnectJitterRatio?: number;
   /** 意外断开（含心跳判死）后是否自动重连，默认 true（仅限曾成功认证过的会话） */
   autoReconnect?: boolean;
+  /**
+   * 流式订阅提前退出（for-await break / throw）时是否向服务端 best-effort
+   * 发送 unsubscribe 帧（P4 资源联动，见 releaseSubscription）。默认 true；
+   * "No subscription" 等错误静默忽略。测试可关。
+   */
+  autoUnsubscribe?: boolean;
 };
 
 export class RealWsJsonClient implements WsJsonClient {
@@ -307,6 +314,7 @@ export class RealWsJsonClient implements WsJsonClient {
   private readonly reconnectBackoffMaxMs: number;
   private readonly reconnectJitterRatio: number;
   private readonly autoReconnect: boolean;
+  private readonly autoUnsubscribe: boolean;
   /** 构造时注入的 socket（测试注入用）；仅首次连接消费，重连一律走工厂 */
   private injectedSocket?: WebSocket;
   private socket?: WebSocket;
@@ -370,6 +378,7 @@ export class RealWsJsonClient implements WsJsonClient {
       Math.max(0, options.reconnectJitterRatio ?? 0.2),
     );
     this.autoReconnect = options.autoReconnect ?? true;
+    this.autoUnsubscribe = options.autoUnsubscribe ?? true;
   }
 
   private static buildHeaders(
@@ -771,6 +780,10 @@ export class RealWsJsonClient implements WsJsonClient {
     this.bufferEnded = true;
     // This ensures that listeners will resolve the promise cleanly from any `for await` loops
     this.buffer.end();
+    // P4（agent/03）：整个会话终结、所有流消费者随之退出——全量回收
+    // dataStore 补丁基底。重连恢复路径不走这里（消费者还活着，基底要留给
+    // 重放后的增量 patch）。
+    this.responseParser.clearStores();
   }
 
   private failReconnectPromise(err: Error) {
@@ -1231,7 +1244,7 @@ export class RealWsJsonClient implements WsJsonClient {
   private dispatch<Req>(
     handler: WebSocketApiMessageHandler<Req>,
     args: Req,
-  ): Observable<NonNullable<ParsedPayloadResponse>> {
+  ): SubscriptionStream<NonNullable<ParsedPayloadResponse>> {
     this.ensureConnected();
     const request = handler.buildRequest(args);
     // Correlate responses with this request using the header echoed by the
@@ -1246,7 +1259,15 @@ export class RealWsJsonClient implements WsJsonClient {
     if (requestService && requestId) {
       this.activeRequests.set(`${requestService}$${requestId}`, request);
     }
-    return this.responseObservable(requestService, requestId);
+    const observable = this.responseObservable(requestService, requestId);
+    // P4（agent/03）：流式订阅的资源回收挂到消费者提前退出路径上——
+    // SubscriptionStream 的 return()/throw()（for-await 的 break / 抛异常）
+    // 经 releaseSubscription 清 dataStore 基底、注销重放登记并 best-effort
+    // 发 unsubscribe。服务端正常终止（buffer.end）不走这里，由 endBuffer
+    // 路径统一清全部。
+    return new SubscriptionStream(observable, () =>
+      this.releaseSubscription(requestService, requestId),
+    );
   }
 
   /**
@@ -1277,10 +1298,19 @@ export class RealWsJsonClient implements WsJsonClient {
         .then(
           (value) => {
             if (key) this.pendingOneShots.delete(key);
+            // P4：一次性请求的首个响应即终态，store 条目（若有 patch 基底）
+            // resolve 后立即回收；one-shot 不入 activeRequests，无需发
+            // unsubscribe（服务端一次性订阅自终止）。
+            if (requestService && requestId) {
+              this.responseParser.removeStore(requestService, requestId);
+            }
             resolve(value);
           },
           (err) => {
             if (key) this.pendingOneShots.delete(key);
+            if (requestService && requestId) {
+              this.responseParser.removeStore(requestService, requestId);
+            }
             reject(err);
           },
         );
@@ -1307,6 +1337,37 @@ export class RealWsJsonClient implements WsJsonClient {
       }
       return true;
     }) as Observable<NonNullable<ParsedPayloadResponse>>;
+  }
+
+  /**
+   * 流式订阅的资源回收（P4，agent/03）：消费者提前退出（for-await 的
+   * break/throw 触发 SubscriptionStream.return()/throw()）时调用。
+   * 1) 删 GenericIncomingMessageHandler.dataStore 里该订阅的补丁基底
+   *    （否则长连接下 quotes/chart 等高频 patch 的基底永久驻留，内存只涨不降）；
+   * 2) 注销 activeRequests 重放登记（否则重连后会重放无人认领的订阅）；
+   * 3) best-effort 向服务端发 unsubscribe（options.autoUnsubscribe，默认开）：
+   *    发出即返回、不等响应——服务端对已不存在的订阅回 "No subscription"
+   *    error 属正常，经 .catch 静默；发送路径的任何异常也吞掉，绝不影响
+   *    消费者侧 return/throw 的语义。走 dispatchOneShot 而非裸 sendMessage
+   *    是为了让 unsubscribe 应答自身的 store 条目也在一-shot settle 时被回收。
+   */
+  private releaseSubscription(
+    service: string | undefined,
+    id: string | undefined,
+  ): void {
+    if (!service || !id) return;
+    this.responseParser.removeStore(service, id);
+    this.activeRequests.delete(`${service}$${id}`);
+    if (!this.autoUnsubscribe || !this.isConnected()) return;
+    try {
+      this.dispatchOneShot(UnsubscribeMessageHandler, {
+        targetService: service,
+        targetRequestId: id,
+      }).catch(() => undefined);
+    } catch (e) {
+      // best-effort：unsubscribe 发送失败不影响本地回收已完成的事实
+      debugLog("best-effort unsubscribe failed for %s$%s: %s", service, id, e);
+    }
   }
 
   /**
@@ -1439,7 +1500,7 @@ export class RealWsJsonClient implements WsJsonClient {
   private dispatchHandler<Req>(
     handlerCtor: Constructor<WebSocketApiMessageHandler<Req>>,
     arg: Req,
-  ): Observable<NonNullable<ParsedPayloadResponse>> {
+  ): SubscriptionStream<NonNullable<ParsedPayloadResponse>> {
     const handler = findByTypeOrThrow(messageHandlers, handlerCtor);
     return this.dispatch(handler, arg);
   }
@@ -1453,6 +1514,9 @@ export class RealWsJsonClient implements WsJsonClient {
     // 显式断开后不再重连，旧订阅的消费者已随 buffer.end() 退出；
     // 清空登记表，避免 reconnect() 向新会话重放无人认领的请求。
     this.activeRequests.clear();
+    // P4：显式断开 = 服务端整个会话销毁，逐个发 unsubscribe 无意义；
+    // 直接清空本地 dataStore 的全部补丁基底（agent/03 内存增长项）。
+    this.responseParser.clearStores();
     const socket = this.socket;
     this.socket = undefined;
     this.state = ChannelState.DISCONNECTED;

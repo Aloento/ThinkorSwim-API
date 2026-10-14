@@ -64,6 +64,40 @@ export default class GenericIncomingMessageHandler {
     return parsed;
   }
 
+  /**
+   * P4（agent/03）：删除 dataStore 中某 service+id 的全部补丁基底条目
+   * （所有 ver）。dataStore 按 `service_id_ver` 只进不出，长连接下（尤其
+   * quotes/chart 高频 patch）会无限增长——客户端在订阅生命周期结束
+   * （iterable 消费者提前退出 / disconnect）时调用本方法回收。
+   * 返回实际删除的条目数（幂等：无匹配时为 0）。
+   */
+  removeStore(service: string, id: string): number {
+    const prefix = `${service}_${id}_`;
+    let removed = 0;
+    for (const key of Object.keys(this.dataStore)) {
+      if (key.startsWith(prefix)) {
+        delete this.dataStore[key];
+        removed++;
+      }
+    }
+    return removed;
+  }
+
+  /** 清空全部补丁基底条目（显式 disconnect 时的全量回收）。 */
+  clearStores(): void {
+    for (const key of Object.keys(this.dataStore)) {
+      delete this.dataStore[key];
+    }
+  }
+
+  /**
+   * @internal 测试钩子：dataStore 当前条目数（P4 内存回归验证用，
+   * 不在公开门面上暴露）。
+   */
+  storeSize(): number {
+    return Object.keys(this.dataStore).length;
+  }
+
   private parsePatch(
     storeKey: string,
     service: ApiService,
