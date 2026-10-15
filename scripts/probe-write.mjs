@@ -606,48 +606,43 @@ async function main() {
 
     case "W11": {
       // AMOUNT（名义额/碎股）线协议形状探测：⚠️ 只 CONFIRM，绝不 SUBMIT。
-      // 目的 = 录到真实帧，确认碎股名义额单在 wire 上如何表达，以及服务端
-      // 回读的 quantity 是否保持碎股（被对齐成整股 = LIMIT notional 陷阱）。
-      // 名义额 $2：高于 TOS 碎股买单 $1.00 下限，且 CONFIRM 不会成交。
-      // 变体逐个发（各自独立草稿 id），由响应/错误帧自曝正确写法。
+      // 2026-10-15 首轮实测（见 git 史）：orderType=AMOUNT 被拒
+      // （"STOCK order may not have AMOUNT type."），错误帧自曝 order 层合法参数
+      // 含 **isNotional** 与 **maxQuantity**，legs 层仅 [symbol, positionEffect,
+      // quantity, taxLotMethod]。第二轮按下表验证 TOS 已知形态：
+      // MARKET + isNotional:true + legs.quantity=美元额（+可选 maxQuantity 上限）。
       const NOTIONAL = Number(process.argv[3] || "2");
       const variants = [
-        // v1：orderType=AMOUNT（types.values 枚举里有 AMOUNT），名义额放 legs.quantity
+        // v5：MARKET + isNotional —— 主候选
         {
-          label: "AMOUNT-leg-quantity",
-          order: {
-            requestType: "INIT_STOCK",
-            orderType: "AMOUNT",
-            legs: [{ symbol: SYMBOL, quantity: NOTIONAL }],
-          },
-        },
-        // v2：orderType=AMOUNT + 显式 amount 字段
-        {
-          label: "AMOUNT-amount-field",
-          order: {
-            requestType: "INIT_STOCK",
-            orderType: "AMOUNT",
-            amount: NOTIONAL,
-            legs: [{ symbol: SYMBOL, quantity: NOTIONAL }],
-          },
-        },
-        // v3：MARKET + legs 同时带 quantity 与 amount（部分前端用二者并存表达名义额）
-        {
-          label: "MARKET-leg-amount",
+          label: "isNotional-qty",
           order: {
             requestType: "INIT_STOCK",
             orderType: "MARKET",
-            legs: [{ symbol: SYMBOL, quantity: NOTIONAL, amount: NOTIONAL }],
+            isNotional: true,
+            legs: [{ symbol: SYMBOL, quantity: NOTIONAL }],
           },
         },
-        // v4：orderType=AMOUNT，legs 不带 quantity（若必填会由错误帧自曝）
+        // v6：+ maxQuantity 上限（前端碎股单常见搭配）
         {
-          label: "AMOUNT-no-quantity",
+          label: "isNotional-maxqty",
           order: {
             requestType: "INIT_STOCK",
-            orderType: "AMOUNT",
-            amount: NOTIONAL,
-            legs: [{ symbol: SYMBOL }],
+            orderType: "MARKET",
+            isNotional: true,
+            maxQuantity: 50,
+            legs: [{ symbol: SYMBOL, quantity: NOTIONAL }],
+          },
+        },
+        // v7：LIMIT + isNotional —— 预期被拒（碎股只允名义市价），拒了也算结论
+        {
+          label: "isNotional-limit",
+          order: {
+            requestType: "INIT_STOCK",
+            orderType: "LIMIT",
+            limitPrice: LIMIT_PRICE,
+            isNotional: true,
+            legs: [{ symbol: SYMBOL, quantity: NOTIONAL }],
           },
         },
       ];
@@ -667,26 +662,114 @@ async function main() {
           1,
         );
         await sleep(5000);
-        const err = seen.find((i) => i.header?.type === "error");
-        if (err) {
+        // 只看本变体草稿的帧：前一个草稿的 patch 流会继续推流，混着看会误判
+        const mine = seen.filter((i) => i.header?.id === id);
+        const err = mine.find((i) => i.header?.type === "error");
+        // 服务端对"字段合法但语义非法"的单不走 error 帧，而是把 error 塞进
+        // 草稿 orders[0].error（首轮实测：AMOUNT type 就是这样被拒的）——
+        // 两处都查才不会被假 ACCEPTED 骗过。
+        const orderErr = mine
+          .map((i) => i.body?.orders?.[0]?.error ?? null)
+          .find(Boolean);
+        if (err || orderErr) {
           console.log(
-            `  [W11 ${v.label}] REJECTED: ${JSON.stringify(err.body ?? err.params ?? {}).slice(0, 300)}`,
+            `  [W11 ${v.label}] REJECTED: ${JSON.stringify(err?.body ?? orderErr ?? {}).slice(0, 300)}`,
           );
         } else {
-          const leg = seen
+          const leg = mine
             .map((i) => i.body?.orders?.[0]?.legs?.[0] ?? null)
             .find(Boolean);
-          const conf = seen
+          const conf = mine
             .map((i) => i.body?.orders?.[0]?.confirmation ?? null)
             .find(Boolean);
+          // patch 流里服务端回写的 actionDescription —— "AMT" 后缀 = 名义额形态
+          const desc = mine
+            .flatMap((i) => i.body?.patches ?? [])
+            .filter((p) => p.path?.endsWith("/actionDescription"))
+            .map((p) => p.value);
+          const qtyPatches = mine
+            .flatMap((i) => i.body?.patches ?? [])
+            .filter((p) =>
+              /\/(quantity|estimatedQuantity|maxQuantity)$/.test(p.path ?? ""),
+            )
+            .map((p) => `${p.path.split("/").pop()}=${p.value}`);
           console.log(
             `  [W11 ${v.label}] ACCEPTED leg=${JSON.stringify(leg ?? {})} conf=${JSON.stringify(conf ?? {})}`,
           );
           console.log(
-            `  [W11 ${v.label}] 碎股判定: quantity=${leg?.quantity} (非整数量级 = 碎股保留)`,
+            `  [W11 ${v.label}] desc="${desc.at(-1) ?? ""}" qty/est: ${qtyPatches.slice(-6).join(" ") || "(none)"}`,
           );
         }
       }
+      break;
+    }
+
+    case "W12": {
+      // 名义额（碎股）单完整下单流，⚠️ 会真成交 —— 仅限 paper（文件头的
+      // papermoney 端点硬闸门是防线）。协议结论（2026-10-15 W11 两轮实测）：
+      //   - STOCK 单没有 AMOUNT orderType；legs 没有 amount 字段
+      //   - isNotional 是 order 级布尔，"can be set to true only at the SUBMIT stage"
+      //   - 名义额放 legs.quantity（W11 v1 草稿回读：quantity=2 原样保留，
+      //     actionDescription="BUY ~ @345.73 AMT"，服务端理解这是 $2 名义额）
+      // 本用例验证 SUBMIT 侧：CONFIRM 建草稿（不带 isNotional）→ SUBMIT 带
+      // isNotional:true → order_events 成交回报里的碎股 quantity。
+      const NOTIONAL = Number(process.argv[3] || "2");
+      const draftId = `update-draft-order-${SYMBOL}-w12`;
+      send(
+        ws,
+        "place_order",
+        draftId,
+        {
+          accountCode: ACCOUNT,
+          action: "CONFIRM",
+          marker: "SINGLE",
+          orders: [
+            {
+              requestType: "INIT_STOCK",
+              orderType: "MARKET",
+              legs: [{ symbol: SYMBOL, quantity: NOTIONAL }],
+            },
+          ],
+        },
+        1,
+      );
+      await sleep(3500);
+      send(ws, "place_order", draftId, {
+        accountCode: ACCOUNT,
+        action: "SUBMIT",
+        marker: "SINGLE",
+        orders: [
+          {
+            requestType: "INIT_STOCK",
+            orderType: "MARKET",
+            isNotional: true,
+            tif: "DAY",
+            legs: [{ symbol: SYMBOL, quantity: NOTIONAL }],
+            tag: "TOSWeb",
+          },
+        ],
+      });
+      await sleep(9000);
+      // 权威读回：order_history 按时间窗拿 QTY/QTY_FILLED/STATUS —— 判定
+      // isNotional 是否真把 quantity 当美元成交，还是被当整股（陷阱）。
+      const nowS = Math.floor(Date.now() / 1000);
+      send(ws, "order_history", "w12-hist", {
+        account: ACCOUNT,
+        startTime: nowS - 3600,
+        endTime: nowS,
+        orderEntryFields: [
+          "ORDER_ID",
+          "SYMBOL",
+          "ORDER_TYPE",
+          "QTY",
+          "QTY_FILLED",
+          "STATUS",
+          "SIDE",
+          "PRICE_TYPE",
+          "DESC",
+        ],
+      });
+      await sleep(4000);
       break;
     }
 

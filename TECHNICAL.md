@@ -229,6 +229,19 @@ TRAILSTOP TRAILSTOPLIMIT MOC LOC`（错误帧扩至 CANCEL/WALK_LIMIT/EXERCISE/�
   不存在）。
 - 期权腿：`optionSeries → option_chain/get(seriesNames)` 拿真实合约
   （wire 带前导点、strike 可小数，如 `.AAPL261014C337.5`）→ `legs[].symbol` 直传。
+- **名义额（碎股）单在本 wire 协议上不可靠 —— 勿假设可用（W11/W12 paper 实测，
+  2026-10-15）**：
+  - STOCK 单没有 `AMOUNT` orderType（草稿帧 `"STOCK order may not have AMOUNT
+type."`，且 `types.values` 全集中无 AMOUNT）；legs 无 `amount` 字段
+    （错误帧自曝 legs 仅 `[symbol, positionEffect, quantity, taxLotMethod]`）。
+  - order 级有 `isNotional`/`maxQuantity`，但 `"The isNotional flag can be set to
+true only at the SUBMIT stage"` —— CONFIRM 阶段带 isNotional 一律拒。
+  - W12：CONFIRM(MARKET, quantity=2, 无 isNotional) → SUBMIT(isNotional:true,
+    quantity=2) **被接受无错**，但 `order_history` 权威回读 =
+    `orderType:MARKET, quantity:2, filledQuantity:2, status:FILLED`
+    —— 按 **2 整股（≈$690）** 成交，`isNotional` 未把 quantity 重解释成美元。
+  - 结论：纸面端至少不兑现碎股名义额；**碎股定投必须走"整股 LIMIT 累加器"回退**
+    （每日记账、攒够 1 股才下整股 LIMIT 单），不得依赖 isNotional。
 
 ### 5.3 订单事件流与状态归一化
 
