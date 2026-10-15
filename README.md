@@ -160,6 +160,10 @@ const client = new RealWsJsonClient({
 
 ## 已知限制
 
+- **碎股（名义额）买单的唯一可靠形状是 MARKET + `legs.quantity` 小数**（live
+  实测定案，TECHNICAL.md §5.2）：无 `AMOUNT` 类型；`isNotional` 是陷阱（CONFIRM
+  阶段必拒，SUBMIT 阶段 paper 接受但按整股成交）；最低 $1、小数位 ≤4。paper 端
+  碎股语义与真实端不同，不可用于验证。
 - 部分服务对 guest 会话权限受限（新闻相关性、筛选器、税务批深查等），真实账户
   正常；写类接口按测试纪律未做真实账户自动化。
 - token 自动续期（`src/auth/authenticator.ts`）经 `access_token/get` 换发的
