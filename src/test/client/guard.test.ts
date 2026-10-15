@@ -5,7 +5,7 @@ import {
   RealWsJsonClient,
   RealWsJsonClientOptions,
 } from "../../client/realWsJsonClient";
-import { GuardError } from "../../client/guard";
+import { GuardError, OrderGuard } from "../../client/guard";
 import ResponseParser from "../../client/responseParser";
 import GenericIncomingMessageHandler from "../../client/services/genericIncomingMessageHandler";
 import { PlaceLimitOrderRequestParams } from "../../client/services/placeOrderMessageHandler";
@@ -226,9 +226,9 @@ describe("guard 安全闸门（拦截矩阵）", () => {
       await expect(
         client.replaceOrder({ ...replaceDraft, quantity: 3 }),
       ).rejects.toThrow(/maxNotionalUsd/);
-      // MARKET 无 limitPrice → 保守拒绝
+      // MARKET 无 limitPrice 也无 notionalUsd → 名义金额不可知，保守拒绝
       await expect(client.submitOrder(marketDraft)).rejects.toThrow(
-        /no limitPrice/,
+        /neither notionalUsd nor limitPrice/,
       );
       // 达标（2×340.9=681.8 ≤1000，|qty|≤10）→ 放行
       void client
@@ -240,6 +240,57 @@ describe("guard 安全闸门（拦截矩阵）", () => {
     } finally {
       client.disconnect();
     }
+  });
+
+  it("notional（碎股名义额）矩阵：美元额可知即按 USD 校验，不再要求 limitPrice", () => {
+    // 与 afterEach 的假定时器推进对齐（纯断言用例，同 GuardError 用例做法）
+    jest.useFakeTimers();
+    // 直接测 OrderGuard 语义：notionalUsd 是纯闸门输入（美元额=下单意图），
+    // 与 wire 形状无关——AMOUNT 的 wire 类型待 W11 录帧后另加。
+    const guard = new OrderGuard(
+      { maxQuantity: 50, maxNotionalUsd: 800 },
+      true,
+    );
+    // 碎股名义额买单的闸门视图：quantity 传 CONFIRM 回读的估算股数（碎股），
+    // notionalUsd 传下单意图的美元额。
+    const fractional = (usd: number, estQty = 0.0146) => ({
+      symbol: "AAPL",
+      accountNumber: "IND-D100579QZ",
+      quantity: estQty,
+      notionalUsd: usd,
+    });
+    // 美元额超限 → 拒（与 qty 无关）
+    expect(() => guard.validateOrder("submitOrder", fractional(900))).toThrow(
+      /maxNotionalUsd/,
+    );
+    // 美元额达标 + 估算股数超 maxQuantity → 拒（两条规则都还要起作用）
+    expect(() => guard.validateOrder("submitOrder", fractional(5, 51))).toThrow(
+      /maxQuantity/,
+    );
+    // 达标：$1.65 碎股买（碎股 qty，无 limitPrice）→ 放行
+    // （旧实现会因"无 limitPrice"一律误拒，碎股定投走不通）
+    expect(() =>
+      guard.validateOrder("submitOrder", fractional(1.65)),
+    ).not.toThrow();
+    // 负数美元额按绝对值校验（$-900 与 $900 同等被拦）
+    expect(() => guard.validateOrder("submitOrder", fractional(-900))).toThrow(
+      /maxNotionalUsd/,
+    );
+    // notionalUsd 与 limitPrice 并存：notionalUsd 优先（美元额是更精确口径）
+    expect(() =>
+      guard.validateOrder("submitOrder", {
+        ...fractional(5),
+        limitPrice: 340.9,
+      }),
+    ).not.toThrow();
+    // 两者皆无（纯 MARKET 股数单）仍保守拒绝
+    expect(() =>
+      guard.validateOrder("submitOrder", {
+        symbol: "AAPL",
+        accountNumber: "IND-D100579QZ",
+        quantity: 5,
+      }),
+    ).toThrow(/neither notionalUsd nor limitPrice/);
   });
 
   it("GuardError 是 Error 子类且 name=GuardError", () => {

@@ -29,6 +29,7 @@
     "node": ">=24"
   },
   "scripts": {
+    "prepare": "tsc -p tsconfig.json",
     "build": "tsc -p tsconfig.json",
     "bundle": "pnpm build && esbuild dist/index.js --bundle --outfile=dist/app.bundle.js --minify --sourcemap --platform=browser --target=es2022",
     "check_prettier": "prettier --check .",

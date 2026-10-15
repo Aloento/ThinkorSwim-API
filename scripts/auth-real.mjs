@@ -6,10 +6,13 @@
 //   2. 前端 tsm/authorize → wsjson login/schwab
 //   3. 收割 sessionStorage.token + login/schwab 响应里的 accessTokenInfo
 //      （真实账户应含 refreshToken——Authenticator 端到端回归的关键证据）
-// 用法: node scripts/auth-real.mjs [--headed]
+// 用法: node scripts/auth-real.mjs [--headed] [--profile <dir>]
 //   默认无头（Chrome new headless，实测与有头指纹逐信号一致，stealth 抹平
 //   webdriver/UA 后即与历史成功登录同指纹，不做手写覆盖）；--headed 回退有头
 //   人工模式（v1 行为：弹窗后全人工完成 F2A）。
+//   --profile：Chrome userDataDir（= "信任设备"本体）。服务器部署必须指到
+//   持久目录（如 /home/ghrunner/tos-state/chrome-profile），否则 profile 丢
+//   = 新设备 = 重新人工 F2A。缺省 scripts/puppeteer-data-real（本地开发）。
 // 凭证: .env.blackbox 的 TOS_REAL_USER / TOS_REAL_PASS
 // F2A: 无头模式自动选渠道；mobile 渠道等你手机上批准、SMS 渠道在终端输码，
 //      共最多 5 分钟。
@@ -26,6 +29,12 @@ const here = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: join(here, ".env.blackbox") });
 
 const HEADLESS = !process.argv.includes("--headed");
+// Chrome userDataDir：--profile <dir> 可指向持久目录（"信任设备"持久化的前提）
+const profileIdx = process.argv.indexOf("--profile");
+const PROFILE_DIR =
+  profileIdx >= 0 && process.argv[profileIdx + 1]
+    ? process.argv[profileIdx + 1]
+    : join(here, "puppeteer-data-real");
 // 指纹策略（exp-fp.mjs 矩阵实测结论）：Chrome 155 的 new headless 与有头
 // 指纹逐信号一致，唯二差异 navigator.webdriver=true 与 UA 里的
 // "HeadlessChrome" token 都由 stealth 的默认 evasion 消除；其余（platform/
@@ -84,9 +93,11 @@ async function main() {
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
+      // 小内存服务器（/dev/shm 常为 RAM 一半甚至更小）：不落 shm，否则 Chrome 崩
+      "--disable-dev-shm-usage",
       "--window-size=1280,900",
     ],
-    userDataDir: join(here, "puppeteer-data-real"),
+    userDataDir: PROFILE_DIR,
   });
   try {
     const page = await browser.newPage();
