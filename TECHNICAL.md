@@ -229,19 +229,22 @@ TRAILSTOP TRAILSTOPLIMIT MOC LOC`（错误帧扩至 CANCEL/WALK_LIMIT/EXERCISE/�
   不存在）。
 - 期权腿：`optionSeries → option_chain/get(seriesNames)` 拿真实合约
   （wire 带前导点、strike 可小数，如 `.AAPL261014C337.5`）→ `legs[].symbol` 直传。
-- **名义额（碎股）单在本 wire 协议上不可靠 —— 勿假设可用（W11/W12 paper 实测，
-  2026-10-15）**：
-  - STOCK 单没有 `AMOUNT` orderType（草稿帧 `"STOCK order may not have AMOUNT
-type."`，且 `types.values` 全集中无 AMOUNT）；legs 无 `amount` 字段
-    （错误帧自曝 legs 仅 `[symbol, positionEffect, quantity, taxLotMethod]`）。
-  - order 级有 `isNotional`/`maxQuantity`，但 `"The isNotional flag can be set to
-true only at the SUBMIT stage"` —— CONFIRM 阶段带 isNotional 一律拒。
-  - W12：CONFIRM(MARKET, quantity=2, 无 isNotional) → SUBMIT(isNotional:true,
-    quantity=2) **被接受无错**，但 `order_history` 权威回读 =
-    `orderType:MARKET, quantity:2, filledQuantity:2, status:FILLED`
-    —— 按 **2 整股（≈$690）** 成交，`isNotional` 未把 quantity 重解释成美元。
-  - 结论：纸面端至少不兑现碎股名义额；**碎股定投必须走"整股 LIMIT 累加器"回退**
-    （每日记账、攒够 1 股才下整股 LIMIT 单），不得依赖 isNotional。
+- 碎股（名义额）买单的真实机制（2026-10-15 live 实测定案，orderId
+  1008310179618：`BUY +0.0394 SCHP MKT` FILLED，≈$1.00）：**MARKET 单 +
+  legs.quantity 传小数**，不需要任何专用类型/标志。硬规则（全部实测）：
+  - 无 `AMOUNT` orderType（草稿帧 `"STOCK order may not have AMOUNT type."`），
+    legs 无 `amount` 字段（legs 仅 `[symbol, positionEffect, quantity,
+taxLotMethod]`）。
+  - `isNotional` 是**陷阱字段**：CONFIRM 阶段带必拒（"can be set to true only
+    at the SUBMIT stage"）；SUBMIT 阶段带它 paper 实测**接受但不兑现**——
+    `quantity:2` 按 2 整股成交（D-72103563，orderId 5411914239），静默错量。
+    **勿用**；`quantityLink=MONEY_AMOUNT` 同样不用（legs 带 quantity 即拒）。
+  - 碎股买单**最低 $1 名义额**（券商拒单文案："Buy notional/Fractional orders
+    can only be placed with minimum of $1 and out to two decimal places"），且
+    quantity 小数位 ≤4（0.0004 草稿被拒 "…more than 4 decimals"，0.001 过）。
+    换算 `qty = ceil(usd/price × 1e4)/1e4` 同时满足两条。
+  - paper 端行为不同且不可信（接受 isNotional、按整股成交）——碎股语义只能
+    live 验证。
 
 ### 5.3 订单事件流与状态归一化
 
