@@ -1,7 +1,7 @@
 // 黑盒写操作用例（W 组），仅纸面账户。仅连 papermoney-services；拒绝连真实端点。
-// 用法: node scripts/probe-write.mjs <W1|W2|W3|W4|W6|W7|W8|W9|W9b|W10>
+// 用法: node scripts/probe-write.mjs <W1|W2|W3|W4|W6|W7|W8|W9|W9b|W10|W11>
 // 安全闸门：数量=1、限价=$1（远离市价，绝不成交）、标的白名单 AAPL、只连 paper。
-// W8/W9/W10：⚠️ 只发 CONFIRM(ver:1)，永不 SUBMIT——MARKET 单
+// W8/W9/W10/W11：⚠️ 只发 CONFIRM(ver:1)，永不 SUBMIT——MARKET 单
 // SUBMIT 会立即成交；期权腿用 option_chain/get 的真实合约 + $0.01 深虚值。
 // 账户代码不硬编码：优先 TOS_PAPER_ACCOUNT，否则登录后从 accounts 现取 D- 开头项。
 import { dirname, join } from "node:path";
@@ -104,9 +104,13 @@ function connect() {
   });
 }
 
+// 最近一次 send 之后收到的 payload 条目（W11 变体判定用；每次 send 前清空）
+const seen = [];
+
 function record(msg) {
   appendFileSync(artFile, JSON.stringify({ t: Date.now(), msg }) + "\n");
   for (const item of msg.payload || []) {
+    seen.push(item);
     const body = JSON.stringify(item.body ?? {}).slice(0, 260);
     console.log(
       `  ← ${item.header?.service}/${item.header?.id} [${item.header?.type}] ${body}`,
@@ -600,8 +604,96 @@ async function main() {
       break;
     }
 
+    case "W11": {
+      // AMOUNT（名义额/碎股）线协议形状探测：⚠️ 只 CONFIRM，绝不 SUBMIT。
+      // 目的 = 录到真实帧，确认碎股名义额单在 wire 上如何表达，以及服务端
+      // 回读的 quantity 是否保持碎股（被对齐成整股 = LIMIT notional 陷阱）。
+      // 名义额 $2：高于 TOS 碎股买单 $1.00 下限，且 CONFIRM 不会成交。
+      // 变体逐个发（各自独立草稿 id），由响应/错误帧自曝正确写法。
+      const NOTIONAL = Number(process.argv[3] || "2");
+      const variants = [
+        // v1：orderType=AMOUNT（types.values 枚举里有 AMOUNT），名义额放 legs.quantity
+        {
+          label: "AMOUNT-leg-quantity",
+          order: {
+            requestType: "INIT_STOCK",
+            orderType: "AMOUNT",
+            legs: [{ symbol: SYMBOL, quantity: NOTIONAL }],
+          },
+        },
+        // v2：orderType=AMOUNT + 显式 amount 字段
+        {
+          label: "AMOUNT-amount-field",
+          order: {
+            requestType: "INIT_STOCK",
+            orderType: "AMOUNT",
+            amount: NOTIONAL,
+            legs: [{ symbol: SYMBOL, quantity: NOTIONAL }],
+          },
+        },
+        // v3：MARKET + legs 同时带 quantity 与 amount（部分前端用二者并存表达名义额）
+        {
+          label: "MARKET-leg-amount",
+          order: {
+            requestType: "INIT_STOCK",
+            orderType: "MARKET",
+            legs: [{ symbol: SYMBOL, quantity: NOTIONAL, amount: NOTIONAL }],
+          },
+        },
+        // v4：orderType=AMOUNT，legs 不带 quantity（若必填会由错误帧自曝）
+        {
+          label: "AMOUNT-no-quantity",
+          order: {
+            requestType: "INIT_STOCK",
+            orderType: "AMOUNT",
+            amount: NOTIONAL,
+            legs: [{ symbol: SYMBOL }],
+          },
+        },
+      ];
+      for (const v of variants) {
+        const id = `update-draft-order-${SYMBOL}-w11-${v.label}`;
+        seen.length = 0;
+        send(
+          ws,
+          "place_order",
+          id,
+          {
+            accountCode: ACCOUNT,
+            action: "CONFIRM",
+            marker: "SINGLE",
+            orders: [v.order],
+          },
+          1,
+        );
+        await sleep(5000);
+        const err = seen.find((i) => i.header?.type === "error");
+        if (err) {
+          console.log(
+            `  [W11 ${v.label}] REJECTED: ${JSON.stringify(err.body ?? err.params ?? {}).slice(0, 300)}`,
+          );
+        } else {
+          const leg = seen
+            .map((i) => i.body?.orders?.[0]?.legs?.[0] ?? null)
+            .find(Boolean);
+          const conf = seen
+            .map((i) => i.body?.orders?.[0]?.confirmation ?? null)
+            .find(Boolean);
+          console.log(
+            `  [W11 ${v.label}] ACCEPTED leg=${JSON.stringify(leg ?? {})} conf=${JSON.stringify(conf ?? {})}`,
+          );
+          console.log(
+            `  [W11 ${v.label}] 碎股判定: quantity=${leg?.quantity} (非整数量级 = 碎股保留)`,
+          );
+        }
+      }
+      break;
+    }
+
     default:
-      console.error("unknown case; use W1|W2|W3|W4|W6|W6b|W7|W8|W9|W9b|W10");
+      console.error(
+        "unknown case; use W1|W2|W3|W4|W6|W6b|W7|W8|W9|W9b|W10|W11",
+      );
       process.exit(2);
   }
 
