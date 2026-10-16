@@ -127,7 +127,7 @@ export default class MockWsJsonClient implements WsJsonClient {
   disconnect(): void {}
 
   reconnect(): Promise<void> {
-    // Mock 连接无真实 socket：空实现
+    // mock 无真实 socket：空实现
     return Promise.resolve();
   }
 
@@ -411,7 +411,7 @@ export default class MockWsJsonClient implements WsJsonClient {
     watchlistId: number,
     symbols: string[],
   ): Promise<ParsedPayloadResponse> {
-    // 线上一致：响应为合并后的完整 watchlist（fixture 直接回传入参）。
+    // 服务端响应为合并后的完整 watchlist
     return Promise.resolve({
       service: "watchlist/add",
       body: {
@@ -446,7 +446,7 @@ export default class MockWsJsonClient implements WsJsonClient {
     _watchlistId: number,
     _symbols: string[],
   ): Promise<ParsedPayloadResponse> {
-    // 线上新顺序生效走 watchlist/get 验证，add 响应为空对象（W5f）。
+    // 线上：新顺序生效走 watchlist/get 验证，rearrange 响应为空对象
     return Promise.resolve({
       service: "watchlist/rearrange",
       body: {},
@@ -683,7 +683,7 @@ export default class MockWsJsonClient implements WsJsonClient {
     });
   }
 
-  /** ⚠️ 危险操作的 mock：仅回固定成功骨架，见 WsJsonClient 接口注释。 */
+  /** 危险操作的 mock：仅回固定成功骨架，见 WsJsonClient 接口注释。 */
   demoAccountSetBalance(
     request: DemoAccountSetBalanceRequestParams,
   ): Promise<ParsedPayloadResponse> {
@@ -693,7 +693,7 @@ export default class MockWsJsonClient implements WsJsonClient {
     });
   }
 
-  /** ⚠️ 危险操作的 mock：仅回固定成功骨架，见 WsJsonClient 接口注释。 */
+  /** 危险操作的 mock：仅回固定成功骨架，见 WsJsonClient 接口注释。 */
   demoAccountAdjustCash(
     request: DemoAccountAdjustCashRequestParams,
   ): Promise<ParsedPayloadResponse> {
@@ -703,7 +703,7 @@ export default class MockWsJsonClient implements WsJsonClient {
     });
   }
 
-  /** ⚠️ 危险操作的 mock：不会真的终止会话，见 WsJsonClient 接口注释。 */
+  /** 危险操作的 mock：不会真的终止会话，见 WsJsonClient 接口注释。 */
   logoff(_: LogoffSchwabRequestParams): Promise<ParsedPayloadResponse> {
     return Promise.resolve({ service: "logoff/schwab", body: {} });
   }
@@ -771,14 +771,14 @@ export default class MockWsJsonClient implements WsJsonClient {
   }
 
   getTaxLots(_: TaxLotGetRequestParams): Promise<ParsedPayloadResponse> {
-    // 成功形状 guest 未实测（权限拒绝），mock 给宽结构。
+    // 成功形状未验证（guest 权限拒绝），mock 给宽结构。
     return Promise.resolve({ service: "tax_lot/get", body: { lots: [] } });
   }
 
   getTransactionCategories(
     _request: TransactionsCategoriesRequestParams,
   ): Promise<ParsedPayloadResponse> {
-    // 成功形状未实测（guest 校验错误），mock 给空对象。
+    // 成功形状未验证（guest 校验错误），mock 给空对象。
     return Promise.resolve({ service: "transactions/categories", body: {} });
   }
 
@@ -796,7 +796,7 @@ export default class MockWsJsonClient implements WsJsonClient {
   }
 
   getSupportChats(): Promise<ParsedPayloadResponse> {
-    // guest 实测 body 为空对象。
+    // 线上 guest 会话 body 为空对象。
     return Promise.resolve({ service: "support_chats", body: {} });
   }
 

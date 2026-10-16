@@ -5,7 +5,6 @@ import WebSocketApiMessageHandler, {
 } from "./webSocketApiMessageHandler.js";
 import type { WatchlistModifyRequestParams } from "./watchlistAddMessageHandler.js";
 
-// 实测自本地录制第 4 帧：
 // 成功响应 body 为空对象；顺序生效需再 watchlist/get 验证。
 export type RawPayloadResponseWatchlistRearrange = Record<string, unknown>;
 

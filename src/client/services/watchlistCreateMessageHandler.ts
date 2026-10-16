@@ -5,12 +5,9 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 实测自本地录制：
-// 请求可用参数集合为 [watchlistName, symbols]（params.name / params.watchlistId
-// 均报 error——create 不支持 upsert）。
-// create 之后增删/重排成分走
-// watchlist/add、watchlist/remove、watchlist/rearrange，
-// 见 watchlistAdd / watchlistRemove / watchlistRearrange MessageHandler。
+// 可用参数仅 [watchlistName, symbols]；params.name / params.watchlistId 报
+// error——create 不支持 upsert。
+// 成分修改走 watchlist/add、watchlist/remove、watchlist/rearrange。
 export type WatchlistCreateRequestParams = {
   watchlistName: string;
   symbols: string[];

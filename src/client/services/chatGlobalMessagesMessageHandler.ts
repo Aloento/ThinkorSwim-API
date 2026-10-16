@@ -4,7 +4,6 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 实测自本地录制（type: snapshot）。
 export type ChatGlobalMessageHours = {
   open: boolean;
   fromTime: string;
@@ -12,16 +11,16 @@ export type ChatGlobalMessageHours = {
 };
 
 export type RawPayloadResponseChatGlobalMessages = {
-  // 实测 key: "CLOSED" | "INCLUDE_SUPPORT_NUMBER" | "OPEN" | "WARNING_MESSAGE_ON"，
+  // key: "CLOSED" | "INCLUDE_SUPPORT_NUMBER" | "OPEN" | "WARNING_MESSAGE_ON"，
   // 值为 html 字符串或 "true"/"false" 字符串。
   messages: Record<string, string>;
   // 例如 "mo_07:00-mo_17:00,tu_07:00-tu_17:00,..."
   hoursSchedule: string;
-  // 实测 key 为星期大写英文（"SUNDAY".."SATURDAY"）
+  // key 为星期大写英文（"SUNDAY".."SATURDAY"）
   chatHours: Record<string, ChatGlobalMessageHours>;
 };
 
-// 交易台 chat 全局公告/服务时间。params 实测为空对象。
+// 交易台 chat 全局公告/服务时间。params 为空对象。
 export default class ChatGlobalMessagesMessageHandler implements WebSocketApiMessageHandler<void> {
   buildRequest(_: void): RawPayloadRequest {
     return newPayload({

@@ -1,5 +1,6 @@
-// 指纹对比探针：headless(new) vs headed，raw vs stealth，逐项关键信号
-// ——确定哪些是"无头新暴露的破绽"（stealth 不覆盖，需要手动补）
+// 指纹对比探针：headless(new) vs headed × raw vs stealth，逐项输出关键信号。
+// 结论：无头与有头指纹一致，差异仅 navigator.webdriver 与 UA 的 "HeadlessChrome"，
+// stealth 默认 evasion 已覆盖，无需手动补。
 import puppeteerExtra from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import puppeteerRaw from "puppeteer";

@@ -1,8 +1,9 @@
-// 真实账户只读功能核对：32 项只读服务全量回归。
-// ⚠️ 绝不发送任何写操作：不下单/不改自选/不删/不 logoff/不动 demo——全部只读服务。
+// 真实账户只读功能核对：全量只读服务回归。
+// 绝不发送任何写操作：不下单/不改自选/不删/不 logoff/不动 demo。
 // 前置：auth-real.mjs 成功（.env.blackbox 有 TOS_REAL_ACCESS_TOKEN/TOS_REAL_WS_URL）。
-// 重点：guest 标 🔧 的服务在真实账户下应拿到成功帧（news_relevant/study_subscribe/
-// scan_query/tax_lot/transactions_categories/support_chats/drawing_sets 等）。
+// 覆盖 guest 下不可达的服务在真实账户下是否拿到成功帧
+// （news_relevant/study_subscribe/scan_query/tax_lot/transactions_categories/
+// support_chats/drawing_sets 等）。
 import { config } from "dotenv";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -126,12 +127,9 @@ await check("chart", async () => {
   return `closes=${candles?.closes?.length ?? "n/a"}`;
 });
 await check("market_depth", async () => {
-  // 真实账户实测（exp-md.mjs）：请求姿势正确（服务端自曝可用参数集
-  // [symbol, refreshRate]，本 handler 只发 symbol ver0 被接受、无错误帧），
-  // 但服务端在此裸 wsjson 会话下不推 depth 帧——页面走
-  // marketDepth-trade-page-chart 大流程带额外订阅上下文。相同参数 guest
-  // 账号能收 snapshot，且真实账户 quotePermissions Level II Equities=true。
-  // 属分类 (c)：参数正确、非库 bug，服务端环境限制。区分错误帧与超时：
+  // 参数正确（服务端可用集 [symbol, refreshRate]），但裸 wsjson 会话下服务端不推
+  // depth 帧——页面走 marketDepth-trade-page-chart 带额外订阅上下文。非库 bug。
+  // 区分错误帧与超时：
   const it = client.marketDepth("AAPL")[Symbol.asyncIterator]();
   let first;
   try {
@@ -164,7 +162,7 @@ await check("market_hours", async () => {
 console.log("[real] --- 期权域 ---");
 await check("optionChain", async () => {
   const r = await client.optionChain("AAPL");
-  // 实测形状：body.series[]（optionSeries 服务，probe artifact 一致）
+  // 返回形状：body.series[]（optionSeries 服务）
   const series = r.body.series ?? [];
   if (!Array.isArray(series)) throw new Error("no series array");
   return `series=${series.length} first=${series[0]?.name}`;
@@ -179,7 +177,7 @@ await check("optionChainQuotes(stream)", async () => {
   return `series=${f.value?.body?.series?.length ?? "?"}`;
 });
 await check("optionQuotes", async () => {
-  // bundle/probe 实测参数：underlyingSymbol + filter；门面是流——取首帧
+  // 参数：underlyingSymbol + filter；门面是流——取首帧
   const frame = await firstFrame(
     client.optionQuotes({ underlyingSymbol: "AAPL", strikeQuantity: 3 }),
   );
@@ -211,7 +209,7 @@ await check("scan_query/get", async () => {
   const cats = await client.getWatchlists({ categories: ["PUBLIC"] });
   const wl = cats.body.categories?.[0]?.watchlists?.[0];
   if (!wl) throw new Error("no watchlist for scan");
-  // 服务端自曝可用参数集以 watchlist 开头——首轮只带 watchlistId 看全表
+  // 服务端自曝的可用参数集以 watchlist 开头；只带 watchlistId 即可拿到完整列表
   try {
     const r = await client.getScanQuery({ watchlistId: wl.id });
     return `service=${r.service} keys=${Object.keys(r.body).join(",")}`;
@@ -222,8 +220,8 @@ await check("scan_query/get", async () => {
   }
 });
 await check("tax_lot/get", async () => {
-  // bundle 实测参数：{account, refreshToken, symbol, taxLotFields}
-  // （refreshToken 是 tax-lot 游标非 auth token，首次传非空占位）
+  // 参数：{account, refreshToken, symbol, taxLotFields}
+  // refreshToken 是 tax-lot 分页游标，非 auth token；首次传非空占位
   try {
     const r = await client.getTaxLots({
       account: accountCode,

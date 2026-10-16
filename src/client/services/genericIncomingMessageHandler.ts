@@ -19,15 +19,15 @@ export default class GenericIncomingMessageHandler {
   /**
    * 基底按 **service+id** 命中，与 ver 无关。
    *
-   * 线上语义（W1/W2 实测）：同一 service+id 是**同一逻辑文档的演进**，
-   * ver 只是文档版本号——place_order 草稿 snapshot 是 ver:1，而 SUBMIT 完成
-   * patch 是 **ver:0 同 id**。旧实现按 `service_id_ver` 查基底，跨 ver patch
-   * 找不到基底 → fast-json-patch 在 `{}` 上应用（remove 不存在的 path 会
-   * **抛错**，即使 validateOperation:false）→ 整条 patch 被丢弃，orderId 丢失。
+   * 同一 service+id 是同一逻辑文档的演进，ver 只是文档版本号：place_order
+   * 草稿 snapshot 是 ver:1，SUBMIT 完成 patch 是 **ver:0 同 id**。按
+   * `service_id_ver` 查基底会让跨 ver patch 找不到基底，fast-json-patch 在
+   * `{}` 上应用（remove 不存在的 path 抛错，即使 validateOperation:false），
+   * 整条 patch 被丢弃、orderId 丢失。
    *
-   * 不变量：每个 service+id 在 dataStore 中**至多一条**基底，键后缀 = 最后一次
-   * snapshot 的 ver（纯诊断用）；patch 合并写回基底键，不新增条目。基底键与
-   * removeStore 用同一前缀规则（`service_id_`），语义保持一致。
+   * 不变量：每个 service+id 在 dataStore 中至多一条基底，键后缀 = 最后一次
+   * snapshot 的 ver（仅诊断用）；patch 合并写回基底键，不新增条目。基底键与
+   * removeStore 用同一前缀规则（`service_id_`）。
    */
   private docPrefix(service: string, id: string): string {
     return `${service}_${id}_`;
@@ -60,9 +60,8 @@ export default class GenericIncomingMessageHandler {
         const storeKey = `${service}_${id}_${ver}`;
         if (type === RESPONSE_TYPE.SNAPSHOT) {
           const body = (entry.body ?? {}) as StoredData;
-          // snapshot 是该逻辑文档的新基底——先清掉同 id 其他 ver 的
-          // 旧条目，避免同文档出现多基底各自漂移（旧 ver 条目残留会让后续
-          // patch 命中哪条取决于遍历顺序）。
+          // snapshot 是该逻辑文档的新基底：先清掉同 service+id 的其他条目，
+          // 避免同文档多基底（残留旧条目会让后续 patch 命中哪条取决于遍历顺序）。
           this.removeStore(service, id);
           this.dataStore[storeKey] = body;
           parsed.push({ service, id, body: entry.body ?? {} });
@@ -120,10 +119,7 @@ export default class GenericIncomingMessageHandler {
     }
   }
 
-  /**
-   * @internal 测试钩子：dataStore 当前条目数（P4 内存回归验证用，
-   * 不在公开门面上暴露）。
-   */
+  /** @internal 测试钩子：dataStore 当前条目数（不在公开门面上暴露）。 */
   storeSize(): number {
     return Object.keys(this.dataStore).length;
   }

@@ -4,12 +4,10 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 实测线上帧（本地录制，前端真实流量）：
-//   → {"service":"unsubscribe","id":"unsubscribe-positions","ver":0}
-//     params {"targetRequestId":"positions","targetService":"positions"}
-//   ← snapshot {"targetService":"support_chats","targetRequestId":"..."}
-//   ← error  "No subscription: positions$positions"（isTerminal，订阅已
-//     不存在时）——error 帧经的 WebSocketApiError 通道 reject。
+// 取消订阅：params {targetService, targetRequestId}，服务端按 `service$id`
+// 定位订阅；响应 snapshot {targetService,targetRequestId}。订阅已不存在时
+// error "No subscription: positions$positions"（isTerminal），经
+// WebSocketApiError 通道 reject。id 惯例 `unsubscribe-<targetId>`。
 export type UnsubscribeRequestParams = {
   // 原订阅请求的 service 与 id（服务端按 `service$id` 定位订阅）
   targetService: ApiService | string;
@@ -21,7 +19,7 @@ export type RawPayloadResponseUnsubscribe = {
   targetRequestId: string;
 };
 
-// 取消订阅（资源清理）。bundle 里 id 惯例 `unsubscribe-<targetId>`。
+// 取消订阅（资源清理）。
 export default class UnsubscribeMessageHandler implements WebSocketApiMessageHandler<UnsubscribeRequestParams> {
   buildRequest({
     targetService,

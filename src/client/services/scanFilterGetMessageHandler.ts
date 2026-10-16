@@ -4,8 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 成功帧实测自本地录制
-// （type: snapshot）。响应四类分组：STOCK/OPTION/FUNDAMENTAL 为 filters[]
+// 响应四类分组：STOCK/OPTION/FUNDAMENTAL 为 filters[]
 // （人类可读筛选器名），STUDY 为 studies{分类名: 研究名[]}。
 export type ScanFiltersByType = {
   STOCK?: { filters: string[] };
@@ -18,10 +17,7 @@ export type RawPayloadResponseScanFilterGet = {
   scanFilters: ScanFiltersByType;
 };
 
-// bundle 调用点（本地录制）：
-//   {service:Q.SCAN_FILTER_GET,...},params:{categories:t}
-// 空参 {} 实测也成功（返回全部分组）；categories 用于只取部分分组，
-// guest 未实测过滤效果。
+// 空参 {} 也成功（返回全部分组）；categories 只取部分分组。
 export type ScanFilterGetRequestParams = {
   categories?: (keyof ScanFiltersByType)[];
 };

@@ -44,7 +44,6 @@ export type ApiService =
   | "user_properties/set"
   | "disclosures/accept"
   | "transactions/categories"
-  // 扩展服务：
   | "news_headers/get_relevant"
   | "news_headers/subscribe"
   | "news_headers/subscribe_relevant"
@@ -77,6 +76,5 @@ export type ApiService =
   | "chat/send_message"
   | "support_chat/messages"
   // bundle 枚举里存在但无 handler（前端用别的服务名达成，或已证伪）：
-  //   quotes/options/centered —— 实测 "Undefined service"
-  //   （本地录制）
+  //   quotes/options/centered —— "Undefined service"
   | "fake"; // testing only

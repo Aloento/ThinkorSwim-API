@@ -14,16 +14,14 @@ import {
 } from "../../client/tdaWsJsonTypes";
 
 /**
- * storeKey-ver 缺陷根治（TECHNICAL.md §3.3 基底跨 ver）。
+ * storeKey 跨 ver 语义。
  *
- * 线上模式（W2 实测）：CONFIRM snapshot ver:1（id=update-draft-order-<SYM>）
- * → 价格 patch ver:1 → SUBMIT patch **ver:0 同 id**（orderId 在
- * /orders/0/orderId）。旧实现 storeKey=service_id_ver，ver:0 patch 找不到
- * ver:1 基底被丢弃，只能靠 submitOrder 的原始帧拦截绕过。
- *
- * 根治语义：同一 service+id 是**同一逻辑文档的演进**——
- * - patch 基底查找跨 ver 命中（service+id）；
- * - snapshot 写入时清理同 id 其他 ver 条目（防多基底漂移），store 不变量：
+ * 服务端实际时序：CONFIRM snapshot ver:1（id=update-draft-order-<SYM>）→
+ * 价格 patch ver:1 → SUBMIT patch **ver:0 同 id**（orderId 在
+ * /orders/0/orderId）。
+ * 同一 service+id 是同一逻辑文档的演进：
+ * - patch 基底查找跨 ver 命中（键 = service+id，不含 ver）；
+ * - snapshot 写入时清理同 id 其他 ver 条目（防多基底漂移）。store 不变量：
  *   每个 service+id 恰好一条基底，键后缀 = 最后 snapshot 的 ver（诊断用）；
  * - removeStore/clearStores 前缀语义不变。
  */
@@ -66,7 +64,7 @@ describe("GenericIncomingMessageHandler 跨 ver 基底", () => {
         },
       }),
     );
-    // 旧实现：ver:0 无基底 → 空文档上 add 抛错 → 条目被丢弃（[]）。
+    // 若无跨 ver 基底：ver:0 patch 在空文档上 add 抛错，条目被丢弃（[]）。
     expect(patched).toHaveLength(1);
     expect(
       (patched[0].body as { orders: { orderId: number }[] }).orders[0].orderId,
@@ -164,7 +162,7 @@ const draft: PlaceLimitOrderRequestParams = {
   limitPrice: 1,
 };
 
-/** W1 CONFIRM 草稿 snapshot（ver:1，截断版：保留 orders+confirmation 结构） */
+/** CONFIRM 草稿 snapshot（ver:1，截断版：保留 orders+confirmation 结构） */
 const confirmSnapshotFrame: RawPayloadResponse = {
   payload: [
     {
@@ -197,7 +195,7 @@ const confirmSnapshotFrame: RawPayloadResponse = {
   ],
 } as RawPayloadResponse;
 
-/** W2 实测 SUBMIT 完成帧：ver:0 同 id patch（remove 确认块 + 写 orderId） */
+/** SUBMIT 完成帧：ver:0 同 id patch（remove 确认块 + 写 orderId） */
 const submitPatchFrame = (orderId: number): RawPayloadResponse =>
   ({
     payload: [
@@ -280,7 +278,7 @@ async function connectClient(
   return { server, client, genericHandler };
 }
 
-describe("submitOrder 统一管道（绕过移除后跨 ver 合并出 orderId）", () => {
+describe("submitOrder 统一管道（跨 ver 合并出 orderId）", () => {
   afterEach(async () => {
     await jest.advanceTimersByTimeAsync(50);
     jest.useRealTimers();
@@ -294,17 +292,17 @@ describe("submitOrder 统一管道（绕过移除后跨 ver 合并出 orderId）
       `ws://localhost:${nextPort++}`,
     );
     try {
-      // 1) CONFIRM：解析管道给出草稿 snapshot；基底必须保留（defer），
-      //    因为 SUBMIT 的 ver:0 patch 要在它上面合并。
+      // 1) CONFIRM：给出草稿 snapshot；基底保留（defer），
+      //    SUBMIT 的 ver:0 patch 要在它上面合并。
       const confirm = client.confirmOrder(draft);
       await waitFor(() => server.messages.length >= 3);
       server.send(confirmSnapshotFrame);
       const confirmed = await confirm;
       expect(confirmed.service).toBe("place_order");
-      expect(genericHandler.storeSize()).toBe(1); // 旧实现：one-shot settle 即删 → 0（RED）
+      expect(genericHandler.storeSize()).toBe(1); // CONFIRM settle 不回收基底
 
-      // 2) SUBMIT：请求帧（ver:0 复用草稿 id）经统一 dispatchOneShot 发出；
-      //    完成帧是跨 ver patch，统一管道合并后 resolve。
+      // 2) SUBMIT：请求帧（ver:0 复用草稿 id）；完成帧是跨 ver patch，
+      //    合并后 resolve。
       const submit = client.submitOrder(draft);
       await waitFor(() =>
         JSON.stringify(server.messages.at(-1)).includes('"action":"SUBMIT"'),
@@ -315,7 +313,7 @@ describe("submitOrder 统一管道（绕过移除后跨 ver 合并出 orderId）
       server.send(submitPatchFrame(5411072868));
       const placed = await submit;
 
-      // 门面契约不变（README/smoke-order 依赖）：body.orderId
+      // 门面契约：body.orderId 顶层可见
       expect(placed.service).toBe("place_order");
       expect(placed.id).toBe("update-draft-order-AAPL");
       expect((placed.body as { orderId?: unknown }).orderId).toBe(5411072868);
@@ -361,8 +359,8 @@ describe("submitOrder 统一管道（绕过移除后跨 ver 合并出 orderId）
       await waitFor(() =>
         JSON.stringify(server.messages.at(-1)).includes('"action":"SUBMIT"'),
       );
-      // W2 实测 frame[5-8]：SUBMIT 之后服务端仍会先推 ver:1 价格 patch
-      // （limitPrice 注入），它们合并进基底但没有 orderId，不得提前 resolve。
+      // SUBMIT 之后服务端可能先推 ver:1 价格 patch（limitPrice 注入）：
+      // 合并进基底但无 orderId，不得提前 resolve。
       server.send({
         payload: [
           {

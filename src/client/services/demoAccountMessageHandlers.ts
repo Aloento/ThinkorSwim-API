@@ -4,22 +4,20 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 模拟盘（demo account）资金操作。参数双证据：
-// 1) 校验帧（线上实测）：
-//    set_balance   "$.params.accountCode: must not be null"
-//    adjust_cash   "$.params.accountCode: must not be null;
-//                   $.params.cashAmount: must not be null"
-// 2) bundle 调用点（本地录制，逐字核对）：
-//    set_balance  id:"set_balance"  params:{accountCode, newBalance, resetAccount:true}
-//    adjust_cash  id:"adjust_cash"  params:{accountCode, cashAmount, description:`Transfer ${cashAmount} dollars`}
-// 响应按 bundle 判定逻辑只关心 type!=="error"（无业务字段），成功帧 guest
-// 未实测——guest 是 PaperMoney 会话，demo_account 服务的适用性待真实
-// 模拟盘账户确认。
+// 模拟盘（demo account）资金操作。
+// 必填校验：set_balance 要求 accountCode 非 null；adjust_cash 要求
+// accountCode、cashAmount 非 null。
+// 参数与 id：
+//   set_balance  id:"set_balance"  params:{accountCode, newBalance, resetAccount:true}
+//   adjust_cash  id:"adjust_cash"  params:{accountCode, cashAmount,
+//                description:`Transfer ${cashAmount} dollars`}
+// 响应只关心 type!=="error"（无业务字段）；guest 是 PaperMoney 会话，
+// demo_account 服务的适用性待真实模拟盘账户确认。
 
 export type DemoAccountSetBalanceRequestParams = {
   accountCode: string;
   newBalance: number;
-  // bundle 固定 true；保留可关（是否重置账户其余状态未实测）
+  // 前端固定 true；是否重置账户其余状态未确认
   resetAccount?: boolean;
 };
 

@@ -95,7 +95,7 @@ export interface WsJsonClient extends Disposable {
 
   accountPositions(accountNumber: string): AsyncIterable<ParsedPayloadResponse>;
 
-  /** accountPositions 的语义别名（TECHNICAL.md：门面统一 get* 命名） */
+  /** accountPositions 的语义别名（门面统一 get* 命名） */
   getPositions(accountNumber: string): AsyncIterable<ParsedPayloadResponse>;
 
   chart(request: ChartRequestParams): AsyncIterable<ParsedPayloadResponse>;
@@ -135,7 +135,7 @@ export interface WsJsonClient extends Disposable {
   ): Promise<ParsedPayloadResponse>;
 
   /**
-   * 下单第一步（W1 实测）：place_order action=CONFIRM ver=1，
+   * 下单第一步：place_order action=CONFIRM ver=1，
    * header.id = update-draft-order-<SYMBOL>。返回草稿 snapshot。
    */
   confirmOrder(
@@ -143,9 +143,9 @@ export interface WsJsonClient extends Disposable {
   ): Promise<ParsedPayloadResponse>;
 
   /**
-   * 下单第二步（W2 实测）：place_order action=SUBMIT ver=0，
-   * **必须复用 confirmOrder 的草稿 id**（update-draft-order-<SYMBOL>），
-   * 换 id 报 "Can not submit while prices are not available!"。
+   * 下单第二步：place_order action=SUBMIT ver=0，必须复用 confirmOrder 的
+   * 草稿 id（update-draft-order-<SYMBOL>）——换 id 报
+   * "Can not submit while prices are not available!"。
    * orderId 经 patch /orders/0/orderId 返回。
    */
   submitOrder(
@@ -172,15 +172,19 @@ export interface WsJsonClient extends Disposable {
 
   watchlist(watchlistId: number): Promise<ParsedPayloadResponse>;
 
-  // ---- 账户域（TECHNICAL.md 实测背书）----
+  // ---- 账户域 ----
 
   getAccounts(): Promise<ParsedPayloadResponse>;
 
+  /**
+   * statement：服务端持久订阅，读完必须退订（见 RealWsJsonClient.dispatchOneShot
+   * 的 releaseSubscription）。
+   */
   getStatement(account: string): Promise<ParsedPayloadResponse>;
 
   getMarginCalls(): Promise<ParsedPayloadResponse>;
 
-  /** market_hours：参数是 {markets, date}，不是 exchanges（线上实测） */
+  /** market_hours：参数是 {markets, date}，不是 exchanges */
   getMarketHours(
     request: MarketHoursRequestParams,
   ): Promise<ParsedPayloadResponse>;
@@ -189,10 +193,10 @@ export interface WsJsonClient extends Disposable {
 
   getMessageCenter(): Promise<ParsedPayloadResponse>;
 
-  /** message_center/subscribe：实测零参数，返回持续推送 */
+  /** message_center/subscribe：零参数，持续推送 */
   subscribeMessageCenter(): AsyncIterable<ParsedPayloadResponse>;
 
-  // ---- 自选列表（scripts/probe-write.mjs W5 系列实测）----
+  // ---- 自选列表 ----
 
   getWatchlists(
     request: WatchlistCategoriesRequestParams,
@@ -208,36 +212,36 @@ export interface WsJsonClient extends Disposable {
 
   deleteWatchlist(watchlistId: number): Promise<ParsedPayloadResponse>;
 
-  /** watchlist/add：响应为合并后的完整 watchlist（W5f 实测） */
+  /** watchlist/add：响应为合并后的完整 watchlist */
   addToWatchlist(
     watchlistId: number,
     symbols: string[],
   ): Promise<ParsedPayloadResponse>;
 
-  /** watchlist/remove：响应为删除成分后的完整 watchlist（W5f 实测） */
+  /** watchlist/remove：响应为删除成分后的完整 watchlist */
   removeFromWatchlist(
     watchlistId: number,
     symbols: string[],
   ): Promise<ParsedPayloadResponse>;
 
-  /** watchlist/rearrange：symbols 为新顺序，响应为空对象（W5f 实测） */
+  /** watchlist/rearrange：symbols 为新顺序，响应为空对象 */
   rearrangeWatchlist(
     watchlistId: number,
     symbols: string[],
   ): Promise<ParsedPayloadResponse>;
 
   // ---- 扩展服务----
-  // 一次性 Promise 型走 dispatchOneShot（语义：断线 reject 不重放）。
+  // 一次性 Promise 型走 dispatchOneShot：断线 reject，不重放。
 
-  /** study/categories：研究指标目录（26 分类/441 研究，实测成功帧） */
+  /** study/categories：研究指标目录 */
   getStudyCategories(): Promise<ParsedPayloadResponse>;
 
-  /** study/subscribe：指标数值推送流（guest 权限受限，参数按校验帧） */
+  /** study/subscribe：指标数值推送流（guest 权限受限） */
   subscribeStudies(
     request: StudySubscribeRequestParams,
   ): AsyncIterable<ParsedPayloadResponse>;
 
-  /** scan_filter/get：screener 筛选器目录（实测成功帧） */
+  /** scan_filter/get：screener 筛选器目录 */
   getScanFilters(
     request?: ScanFilterGetRequestParams,
   ): Promise<ParsedPayloadResponse>;
@@ -252,15 +256,15 @@ export interface WsJsonClient extends Disposable {
     request: ScanQueryGetRequestParams,
   ): Promise<ParsedPayloadResponse>;
 
-  /** scan_query/save：保存 screener 查询（bundle 证据） */
+  /** scan_query/save：保存 screener 查询 */
   saveScanQuery(
     request: ScanQuerySaveRequestParams,
   ): Promise<ParsedPayloadResponse>;
 
-  /** quotes/get：一次性报价快照（不建立持续订阅；实测成功帧） */
+  /** quotes/get：一次性报价快照，服务端订阅自灭，可重复调用 */
   getQuotes(request: QuotesGetRequestParams): Promise<ParsedPayloadResponse>;
 
-  /** fundamentals/history：历史基本面序列（guest 校验帧未过，待真实账户） */
+  /** fundamentals/history：历史基本面序列（guest 校验不通过） */
   getFundamentalsHistory(
     request: FundamentalsHistoryRequestParams,
   ): Promise<ParsedPayloadResponse>;
@@ -270,12 +274,12 @@ export interface WsJsonClient extends Disposable {
     request: AccessTokenGetRequestParams,
   ): Promise<ParsedPayloadResponse>;
 
-  /** auth_code/get：refreshToken 换一次性 auth code（bundle 证据） */
+  /** auth_code/get：refreshToken 换一次性 auth code */
   getAuthCode(
     request: AuthCodeGetRequestParams,
   ): Promise<ParsedPayloadResponse>;
 
-  /** analyst_reports/token：分析师报告第三方访问 token（实测成功帧） */
+  /** analyst_reports/token：分析师报告第三方访问 token */
   getAnalystReportsToken(): Promise<ParsedPayloadResponse>;
 
   createDrawing(
@@ -309,7 +313,7 @@ export interface WsJsonClient extends Disposable {
     request: NewsHeadersGetRelevantRequestParams,
   ): Promise<ParsedPayloadResponse>;
 
-  /** news_headers/subscribe：新闻标题推送流（bundle 证据，未实测） */
+  /** news_headers/subscribe：新闻标题推送流 */
   subscribeNews(
     request: NewsHeadersSubscribeRequestParams,
   ): AsyncIterable<ParsedPayloadResponse>;
@@ -333,19 +337,19 @@ export interface WsJsonClient extends Disposable {
     request: SupportChatMessagesRequestParams,
   ): Promise<ParsedPayloadResponse>;
 
-  /** tax_lot/update：税批选择更新（bundle 证据，未实测） */
+  /** tax_lot/update：税批选择更新（写操作） */
   updateTaxLot(
     request: TaxLotUpdateRequestParams,
   ): Promise<ParsedPayloadResponse>;
 
-  /** unsubscribe：取消订阅（资源清理，实测线上帧） */
+  /** unsubscribe：取消服务端订阅（资源清理） */
   unsubscribe(
     request: UnsubscribeRequestParams,
   ): Promise<ParsedPayloadResponse>;
 
   /**
-   * ⚠️ demo_account/set_balance：重置模拟盘余额——破坏性资金操作，
-   * 成功帧 guest 未实测；绝不要在共享/真实账户会话上冒烟调用。
+   * demo_account/set_balance：重置模拟盘余额，破坏性资金操作，guest 未验证
+   * 成功帧。只在自建 demo 账户上调用。
    * @deprecated 危险操作：仅在自建 demo 账户上显式使用。
    */
   demoAccountSetBalance(
@@ -353,8 +357,8 @@ export interface WsJsonClient extends Disposable {
   ): Promise<ParsedPayloadResponse>;
 
   /**
-   * ⚠️ demo_account/adjust_cash：模拟盘现金划转——破坏性资金操作；
-   * 绝不要在共享/真实账户会话上冒烟调用。
+   * demo_account/adjust_cash：模拟盘现金划转，破坏性资金操作。
+   * 只在自建 demo 账户上调用。
    * @deprecated 危险操作：仅在自建 demo 账户上显式使用。
    */
   demoAccountAdjustCash(
@@ -362,15 +366,15 @@ export interface WsJsonClient extends Disposable {
   ): Promise<ParsedPayloadResponse>;
 
   /**
-   * ⚠️ logoff/schwab：终止服务端 Schwab 会话——调用后当前 accessToken 失效，
-   * 需完整重认证。绝不要在冒烟里调用。
+   * logoff/schwab：终止服务端 Schwab 会话，调用后当前 accessToken 失效，
+   * 需完整重认证。
    * @deprecated 危险操作：终结会话，仅显式登出时使用。
    */
   logoff(request: LogoffSchwabRequestParams): Promise<ParsedPayloadResponse>;
 
   // ---- 补充服务----
 
-  /** news_headers/get：新闻标题 snapshot（实测参数 [symbol, limit?]） */
+  /** news_headers/get：新闻标题 snapshot，参数 [symbol, limit?] */
   getNews(request: NewsHeadersGetRequestParams): Promise<ParsedPayloadResponse>;
 
   /** fundamentals/current：当前基本面（symbol/time/fields 均必传） */
@@ -391,14 +395,14 @@ export interface WsJsonClient extends Disposable {
     request: OrderHistoryRequestParams,
   ): Promise<ParsedPayloadResponse>;
 
-  /** tax_lot/get：税则批次（guest 被拒，真实账户待测） */
+  /** tax_lot/get：税则批次（guest 被拒） */
   getTaxLots(request: TaxLotGetRequestParams): Promise<ParsedPayloadResponse>;
 
   /**
-   * transactions/categories：账户交易流水分类目录。
-   * 真实账户实测（exp-tc.mjs）：6 参数 {startTime,endTime,account,
-   * transactionCategories,cryptoTransactionTypes,cashFutureTransactionTypes}
-   * 必填（后三个可空数组），只发 account 报校验错误。
+   * transactions/categories：交易流水分类目录。6 参数必填
+   * {startTime,endTime,account,transactionCategories,
+   * cryptoTransactionTypes,cashFutureTransactionTypes}，后三个可为空数组；
+   * 只发 account 报校验错误。
    */
   getTransactionCategories(
     request: TransactionsCategoriesRequestParams,
@@ -407,19 +411,15 @@ export interface WsJsonClient extends Disposable {
   /** chat_global/messages：chat 全局公告流（首帧 snapshot，变更推送） */
   subscribeGlobalChats(): AsyncIterable<ParsedPayloadResponse>;
 
-  /** support_chats：客服会话列表（guest 实测空 body） */
+  /** support_chats：客服会话列表 */
   getSupportChats(): Promise<ParsedPayloadResponse>;
 
-  /**
-   * ⚠️ user_properties/set：写用户属性（写操作，参数形状未实测确认）。
-   */
+  /** user_properties/set：写用户属性（写操作，参数形状未验证） */
   setUserProperties(
     request: UserPropertiesSetRequestParams,
   ): Promise<ParsedPayloadResponse>;
 
-  /**
-   * ⚠️ disclosures/accept：接受披露协议（写操作，disclosureIds 非空）。
-   */
+  /** disclosures/accept：接受披露协议（写操作，disclosureIds 非空） */
   acceptDisclosures(
     request: DisclosuresAcceptRequestParams,
   ): Promise<ParsedPayloadResponse>;

@@ -4,27 +4,25 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 必填校验抄自本地录制：
-// "$.params.watchlistId: must not be null"。guest 传 watchlistId=100 过
-// 校验但报 "Unexpected server error"（isTerminal，线上实测：guest
-// screener 不可用），成功帧待真实账户。
-// bundle 调用点：params:{watchlistId:t}，id 动态
-// （`scan_query/get-${随机}`）——screener 查询条件在 bundle 里随
-// scan_filter 结果扩展，guest 无法枚举完整形状，最小建模如下并留索引签名。
+// 必填校验："$.params.watchlistId: must not be null"。
+// 过校验后仍可能报 "Unexpected server error"（isTerminal，guest screener
+// 不可用），成功帧待真实账户。
+// 查询条件在前端随 scan_filter 结果扩展，完整形状不可枚举，最小建模如下并
+// 留索引签名。
 export type ScanQueryGetRequestParams = {
   watchlistId: number;
   // 筛选条件（scan_filter/get 返回的 STOCK/OPTION/... 分组名 → 条件），
-  // 完整字段集合 guest 不可达，未验证。
+  // 完整字段集合不可达，未验证。
   [key: string]: unknown;
 };
 
-// 响应体形状 guest 不可达，未验证（预期为命中 symbols/结果集）。
+// 响应体形状不可达，未验证（预期为命中 symbols/结果集）。
 export type RawPayloadResponseScanQueryGet = {
   [key: string]: unknown;
 };
 
 // screener 查询（在指定 watchlist 范围内执行筛选）。guest 受限，
-// params 按校验帧写全，成功帧待真实账户。
+// 成功帧待真实账户。
 export default class ScanQueryGetMessageHandler implements WebSocketApiMessageHandler<ScanQueryGetRequestParams> {
   buildRequest(request: ScanQueryGetRequestParams): RawPayloadRequest {
     return newPayload({

@@ -4,9 +4,8 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 实测校验（本地录制）：
-// "$.params.disclosureIds: must not be empty"。guest 会话无可接受披露，
-// 成功响应形状未实测（线上实测：服务存在但 "guest 无披露可接受"）。
+// 服务端校验："$.params.disclosureIds: must not be empty"。
+// guest 会话无可接受披露，成功响应形状未验证。
 export type DisclosuresAcceptRequestParams = {
   disclosureIds: number[];
 };

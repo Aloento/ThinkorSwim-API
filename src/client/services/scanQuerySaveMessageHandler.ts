@@ -4,14 +4,14 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 参数逐字抄自前端 bundle（本地录制）调用点：
+// 参数：
 //   params:{queryName, watchlistType, allGroupFilters, noneGroupFilters,
 //           anyGroupFilters, filterMode, scanInWatchlist, limit(默认 1000), sort}
-// 响应形状 guest 不可达（screener 权限受限，TECHNICAL.md 第五轮），线上帧未实测。
+// 响应形状不可达（screener 权限受限），线上帧未验证。
 
 export type ScanQuerySaveRequestParams = {
   queryName: string;
-  // bundle 未枚举取值（筛选范围类型），未实测
+  // 筛选范围类型，取值未枚举
   watchlistType: string;
   allGroupFilters: unknown[];
   noneGroupFilters: unknown[];

@@ -4,11 +4,9 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// fundamentals/history 实测（本地录制，
-// exp-fund-hist3.mjs guest paper 逐字段扫描，2026-10-14）：
-// 参数仅 {symbol, fields}——**没有 time**：bundle 调用点里的 time 是前端网关
-// 层剥掉的，线协议直接拒（`Mismatched request parameter name is "params.time"`，
-// 见线上实测三帧）。
+// fundamentals/history 参数仅 {symbol, fields}——**没有 time**：前端调用点
+// 里的 time 由网关层剥掉，线协议直接拒
+// `Mismatched request parameter name is "params.time"`。
 // fields 必填非空，且只收 21 个 historical 字段（current 45 枚举的真子集，
 // 集合外报 "Non historical field requested: X"）。
 export const FUNDAMENTALS_HISTORY_FIELDS = [
@@ -43,9 +41,9 @@ export type FundamentalsHistoryRequestParams = {
   fields: FundamentalsHistoryField[];
 };
 
-// 实测 snapshot（fund-hist-findings.md）：键为 "year=2025, interval=Q2" /
-// "year=2021, interval=ANNUAL" 形式的序列；季度序列字段 annualValues 可为空
-// 对象，INTEREST_RATE/FIXED_CHARGE_COVERAGE_RATIO 仅 annualValues。
+// snapshot 键为 "year=2025, interval=Q2" / "year=2021, interval=ANNUAL"
+// 形式的序列；季度序列的 annualValues 可为空对象，
+// INTEREST_RATE/FIXED_CHARGE_COVERAGE_RATIO 仅 annualValues。
 export type FundamentalsHistorySeries = Partial<
   Record<FundamentalsHistoryField, Record<string, number | string | null>>
 >;
@@ -56,7 +54,7 @@ export type RawPayloadResponseFundamentalsHistory = {
   annualValues?: FundamentalsHistorySeries;
 };
 
-// 历史基本面数据（按年度/季度序列）。guest paper 实测 snapshot 通过。
+// 历史基本面数据（按年度/季度序列）。
 export default class FundamentalsHistoryMessageHandler implements WebSocketApiMessageHandler<FundamentalsHistoryRequestParams> {
   buildRequest({
     symbol,

@@ -4,10 +4,9 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 实测（线上错误帧）：
 // 服务端明确 "No parameters are expected"——发送 alertTypes/messageTypes 均报
 // "Mismatched request parameter name"。订阅即建立推送，无可调参数。
-// 响应未实测（订阅成功的推送形态待有消息时补测）。
+// 响应未验证（推送形态待有消息时补测）。
 export type RawPayloadResponseMessageCenterSubscribe = Record<string, unknown>;
 
 // 消息中心：订阅消息推送。服务端不接受任何参数。

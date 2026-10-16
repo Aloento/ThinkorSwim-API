@@ -4,10 +4,9 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 枚举抄自本地录制错误帧：
-// "Possible enum values are [ASK, ASK_EXCHANGE, ASK_SIZE, BID,
-// BID_EXCHANGE, BID_SIZE, LAST, LAST_ETH, LAST_RTH, LAST_EXCHANGE,
-// LAST_SIZE, VOLUME]"——一次性报价可用字段（无流式 MARK 等）。
+// 可用字段枚举：[ASK, ASK_EXCHANGE, ASK_SIZE, BID, BID_EXCHANGE, BID_SIZE,
+// LAST, LAST_ETH, LAST_RTH, LAST_EXCHANGE, LAST_SIZE, VOLUME]
+// ——一次性报价无流式 MARK 等字段。
 const QUOTES_GET_FIELDS = [
   "ASK",
   "ASK_EXCHANGE",
@@ -25,7 +24,7 @@ const QUOTES_GET_FIELDS = [
 
 export type QuotesGetField = (typeof QUOTES_GET_FIELDS)[number];
 
-// bundle 默认字段集合（frontend-index.js，逐字核对）不含 LAST_ETH。
+// 默认字段集合不含 LAST_ETH。
 export const DEFAULT_QUOTES_GET_FIELDS: QuotesGetField[] = [
   "BID",
   "BID_SIZE",
@@ -45,8 +44,7 @@ export type QuotesGetRequestParams = {
   fields?: QuotesGetField[];
 };
 
-// 响应形状实测自同文件第 3 帧（type: snapshot）：
-// {items:[{symbol, isDelayed, values:{ASK:341.19, ...}}]}
+// 响应：{items:[{symbol, isDelayed, values:{ASK:341.19, ...}}]}
 export type QuotesGetItem = {
   symbol: string;
   isDelayed: boolean;

@@ -4,7 +4,6 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 字段实测自本地录制（type: snapshot）。
 // 账户摘要数值，随账户类型不同字段可能有增减，故均为可选。
 export type StatementValues = {
   NET_LIQ?: number;
@@ -42,7 +41,7 @@ export type RawPayloadResponseStatement = {
   values: StatementValues;
 };
 
-// 账户单日账单摘要，params 实测为 { account }。
+// 账户单日账单摘要，params 为 { account }。
 export default class StatementMessageHandler implements WebSocketApiMessageHandler<string> {
   buildRequest(account: string): RawPayloadRequest {
     return newPayload({

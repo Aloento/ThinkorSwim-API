@@ -5,12 +5,11 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// bundle 调用点（本地录制，逐字核对）：
+// 参数：
 //   news_headers/subscribe_relevant  params:{symbols}   （无 sortMode）
 //   news_body                        params:{newsCode}
 //                                    响应 {newsCode, text}
-// 均为 bundle 证据，线上帧未实测；get_relevant 对 guest 已报
-// "not permissioned"（线上实测），subscribe_relevant
+// get_relevant 对 guest 报 "not permissioned"，subscribe_relevant
 // 预计同样 guest 权限受限。
 
 export type NewsHeadersSubscribeRelevantRequestParams = {
@@ -32,7 +31,7 @@ export type RawPayloadResponseNewsBody = {
   text: string;
 };
 
-// 相关度新闻订阅（guest 权限受限，params 按 bundle 写全）。
+// 相关度新闻订阅（guest 权限受限，参数未线上验证）。
 export default class NewsHeadersSubscribeRelevantMessageHandler implements WebSocketApiMessageHandler<NewsHeadersSubscribeRelevantRequestParams> {
   buildRequest({
     symbols,

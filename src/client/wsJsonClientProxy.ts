@@ -79,7 +79,6 @@ const logger = debug("wsClientProxy");
 export const ALL_REQUESTS = [
   "authenticateWithAuthCode",
   "authenticateWithAccessToken",
-  // A6：optionChainQuotes 曾在 68/78 行重复出现两次，去重
   "disconnect",
   "reconnect",
   "quotes",
@@ -117,8 +116,7 @@ export const ALL_REQUESTS = [
   "addToWatchlist",
   "removeFromWatchlist",
   "rearrangeWatchlist",
-  // ---- 扩展服务：全部单对象参数，wire 上 args 即参数本体，
-  // 无需 relaySpread（lead 建议：新门面方法尽量单对象参数）----
+  // ---- 扩展服务：均为单对象参数，wire 上 args 即参数本体 ----
   "getStudyCategories",
   "subscribeStudies",
   "getScanFilters",
@@ -756,7 +754,7 @@ export class WsJsonClientProxy implements WsJsonClient {
     ).promise();
   }
 
-  /** ⚠️ 危险操作透传，见 WsJsonClient 接口注释。 */
+  /** 危险操作透传，见 WsJsonClient 接口注释。 */
   demoAccountSetBalance(
     request: DemoAccountSetBalanceRequestParams,
   ): Promise<ParsedPayloadResponse> {
@@ -766,7 +764,7 @@ export class WsJsonClientProxy implements WsJsonClient {
     ).promise();
   }
 
-  /** ⚠️ 危险操作透传，见 WsJsonClient 接口注释。 */
+  /** 危险操作透传，见 WsJsonClient 接口注释。 */
   demoAccountAdjustCash(
     request: DemoAccountAdjustCashRequestParams,
   ): Promise<ParsedPayloadResponse> {
@@ -776,7 +774,7 @@ export class WsJsonClientProxy implements WsJsonClient {
     ).promise();
   }
 
-  /** ⚠️ 危险操作透传，见 WsJsonClient 接口注释。 */
+  /** 危险操作透传，见 WsJsonClient 接口注释。 */
   logoff(request: LogoffSchwabRequestParams): Promise<ParsedPayloadResponse> {
     return this.dispatch<ParsedPayloadResponse>("logoff", request).promise();
   }
@@ -849,7 +847,7 @@ export class WsJsonClientProxy implements WsJsonClient {
     return this.dispatch<ParsedPayloadResponse>("getSupportChats").promise();
   }
 
-  /** ⚠️ 写操作透传，见 WsJsonClient 接口注释。 */
+  /** 写操作透传，见 WsJsonClient 接口注释。 */
   setUserProperties(
     request: UserPropertiesSetRequestParams,
   ): Promise<ParsedPayloadResponse> {
@@ -859,7 +857,7 @@ export class WsJsonClientProxy implements WsJsonClient {
     ).promise();
   }
 
-  /** ⚠️ 写操作透传，见 WsJsonClient 接口注释。 */
+  /** 写操作透传，见 WsJsonClient 接口注释。 */
   acceptDisclosures(
     request: DisclosuresAcceptRequestParams,
   ): Promise<ParsedPayloadResponse> {
@@ -913,11 +911,9 @@ export class WsJsonClientProxy implements WsJsonClient {
   }
 
   /**
-   * 代理通道的请求分发。注意：与 realWsJsonClient ≤v0.13.1 同款的
-   * "共享拉取队列 + filter 丢弃"形态（TECHNICAL.md §9.12）——同一 method
-   * 并发多次调用时同样会互相吞帧。代理协议按 method 单路复用、当前用法
-   * （testApp 单连接顺序调用）不触发；若代理要承载并发调用，需照
-   * responseRouter.ts 的模式改造（本地 socket 上同样按 key 分队列）。
+   * 代理通道的请求分发：共享拉取队列 + 按 method filter，同一 method 并发
+   * 多次调用会互相吞帧；单连接顺序调用安全。要承载并发需按 responseRouter
+   * 的模式改造（按 key 分队列）。
    */
   private dispatch<T>(req: Request, args?: any): Observable<T> {
     this.sendMessage({ request: req, args });

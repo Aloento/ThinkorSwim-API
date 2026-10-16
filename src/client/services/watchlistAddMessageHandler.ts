@@ -5,15 +5,14 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 实测自本地录制第 1/2 帧：
-// 可用参数集合为 [watchlistId, symbols]（"params.symbol" 单数报 error）。
+// 可用参数仅 [watchlistId, symbols]；params.symbol（单数）报 error。
 export type WatchlistModifyRequestParams = {
   watchlistId: number;
   symbols: string[];
 };
 
-// 成功响应为**合并后**的完整 watchlist（W5f 第 1 帧：
-// {"watchlist":{"id":1222638110,"name":"ProbeWL","symbols":["AAPL","SPY","TSLA"]}}）。
+// 成功响应为**合并后**的完整 watchlist，
+// 如 {"watchlist":{"id":1222638110,"name":"ProbeWL","symbols":["AAPL","SPY","TSLA"]}}。
 export type RawPayloadResponseWatchlistAdd = {
   watchlist: GetWatchListResponseItem;
 };

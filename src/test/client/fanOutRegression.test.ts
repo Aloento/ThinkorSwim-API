@@ -11,15 +11,13 @@ import QuotesGetMessageHandler from "../../client/services/quotesGetMessageHandl
 import { ParsedPayloadResponse } from "../../client/tdaWsJsonTypes";
 
 /**
- * 2026-10-16 挂死事故的回归测试（Schwab-DCA run 38878151523：
- * dry_run 第二轮的第一个 getQuotes 永久挂起，CI 7 分钟后人工取消）。
+ * 帧分发（fan-out）回归测试。
  *
- * 旧模型（单条共享队列 + filter 丢弃）下，只要一个请求的等待者先拉走了
- * 属于另一个请求的帧，那帧就被 filter 永久丢弃；本测试模拟生产里的
- * 「流式请求提前 break，后续 one-shot 的响应帧落在同一个 socket 上」，
- * 在旧实现上第二轮 getQuotes 永不 resolve（jest 超时即失败）。
- *
- * 修复后（ResponseRouter：单泵 + 每订阅者专属队列）每轮都干净完成。
+ * 共享拉取队列 + filter 丢弃的模型下，一个请求的等待者先拉走属于另一个请求的
+ * 帧，那帧就被永久丢弃 → 后续请求挂死。这里覆盖生产里的两种场景：
+ * 「流式请求提前 break，后续 one-shot 的响应帧落在同一 socket」，以及
+ * 「持续 for-await 的流与 one-shot 并发」。
+ * 单泵 + 每订阅者专属队列（ResponseRouter）下每轮都干净完成。
  */
 
 const WS_URL = "ws://localhost:9871";
@@ -139,7 +137,7 @@ async function expectSent(
       throw new Error("expectSent: timed out waiting for request frame");
     await new Promise((r) => setTimeout(r, stepMs));
   }
-  // 断言"恰好一次"：重复发送同一请求帧属于回归（挂死场景重试的隐患）
+  // 断言"恰好一次"：重复发送同一请求帧属于回归
   expect(matches()).toHaveLength(1);
 }
 
@@ -173,8 +171,8 @@ async function authenticate(server: WS, client: RealWsJsonClient) {
 }
 
 /**
- * 复刻 DCA dry_run 的一轮：positions 流（收 snapshot 即 break）→
- * statement one-shot → quotes/get one-shot。响应顺序按线上实况：
+ * 一轮混合调用：positions 流（收 snapshot 即 break）→ statement one-shot →
+ * quotes/get one-shot。响应顺序与服务端实况一致：
  * positions snapshot 之后才发后续请求的响应。
  */
 async function runRound(
@@ -199,7 +197,7 @@ async function runRound(
   server.send(statementSnapshot);
   await withTimeout(statement, 2000, "statement round");
 
-  // 3) quotes/get one-shot——事故里第一轮这步成功、第二轮永久挂起
+  // 3) quotes/get one-shot
   const quotes = client.getQuotes({
     symbols: ["SCHF"],
     fields: ["LAST", "BID", "ASK"],
@@ -212,7 +210,7 @@ async function runRound(
   ).toBe(last);
 }
 
-describe("fan-out regression (2026-10-16 hang)", () => {
+describe("fan-out regression", () => {
   afterEach(() => {
     WS.clean();
   });
@@ -221,11 +219,9 @@ describe("fan-out regression (2026-10-16 hang)", () => {
     const { server, client } = setup();
     try {
       await authenticate(server, client);
-      // 第一轮：positions(break) → statement → quotes
+      // 多轮串联：残留等待者吞帧时，第二轮起挂死
       await runRound(server, client, 2, 33.1);
-      // 第二轮：旧实现从这里开始挂死（残留等待者吞帧）
       await runRound(server, client, 5, 33.2);
-      // 第三轮保险：事故现场是"第二轮起必挂"，多跑一轮坐实稳定性
       await runRound(server, client, 8, 33.3);
     } finally {
       client.disconnect();
@@ -233,9 +229,7 @@ describe("fan-out regression (2026-10-16 hang)", () => {
   }, 15_000);
 
   it("a stream that never breaks does not starve one-shot requests", async () => {
-    // 另一个吞帧场景：一个持续 for-await 的流与 one-shot 并发。
-    // 旧模型里流消费者与 one-shot 抢同一条队列，snapshot 类帧
-    // 可能落入错误等待者被丢弃。
+    // 持续 for-await 的流与 one-shot 并发：两类帧必须各归各位
     const { server, client } = setup();
     try {
       await authenticate(server, client);
@@ -271,7 +265,7 @@ describe("fan-out regression (2026-10-16 hang)", () => {
   }, 15_000);
 
   it("an error frame terminates every consumer of that request", async () => {
-    // error 语义保持：promise 与 iterable 双消费者都要收到 WebSocketApiError
+    // error 帧以 WebSocketApiError 终止该订阅上等待中的消费者
     const { server, client } = setup();
     try {
       await authenticate(server, client);

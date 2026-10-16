@@ -4,7 +4,6 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 响应实测自本地录制。
 // body 顶层为 items + exchanges；items[].symbol 形如 ".AAPL261014C245"。
 export type RawOptionQuotesSnapshotBodyResponse = {
   items: OptionQuoteItem[];
@@ -28,8 +27,8 @@ export type OptionQuoteItemValue = {
 
 export type OptionQuotesFilter = {
   seriesNames?: string[];
-  // 实测服务端校验（线上 error 帧）：
-  // "Either strikeQuantity or both minStrike and maxStrike must be specified"
+  // 服务端校验："Either strikeQuantity or both minStrike and maxStrike must be
+  // specified"
   strikeQuantity?: number;
   minStrike?: number;
   maxStrike?: number;
@@ -37,7 +36,6 @@ export type OptionQuotesFilter = {
 
 export type OptionQuotesRequestParams = {
   underlyingSymbol: string;
-  // 可选，实测确认（实测：seriesNames 可选）
   seriesNames?: string[];
   minStrike?: number;
   maxStrike?: number;

@@ -39,14 +39,14 @@ export type RawAlertResponse = {
   expirationTime: number;
   lastTriggeredTime: number;
   status: AlertStatus;
-  // 实测两帧均含 tag: "TDA"（线上实测）
+  // 恒含 tag: "TDA"（遗留字段）
   tag: string;
   market: {
     field: string;
     operator: string;
     exchange: string;
     threshold: number;
-    // 实测请求只需 {symbol, quantity}；服务端回填 cusip/sus/assetType，
+    // 请求只需 {symbol, quantity}；服务端回填 cusip/sus/assetType，
     // 故除 symbol/quantity 外均为可选。
     components: {
       symbol: string;

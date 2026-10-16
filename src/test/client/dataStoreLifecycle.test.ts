@@ -16,7 +16,7 @@ import {
 } from "../../client/tdaWsJsonTypes";
 
 /**
- * 任务11：dataStore 生命周期清理 + iterable 提前退出联动。
+ * dataStore 生命周期清理 + iterable 提前退出联动。
  * - handler 级：removeStore（按 service$id 前缀删全部 ver）/ clearStores /
  *   storeSize 测试钩子的直接单测；
  * - 客户端级：for-await break / 循环体异常触发 SubscriptionStream 的
@@ -24,8 +24,8 @@ import {
  *   autoUnsubscribe:false 可关）；one-shot settle 后条目回收；
  *   disconnect() 全量清空且不发逐订阅的 unsubscribe 帧。
  *
- * 用真实定时器（同 wsJsonClient.test.ts）：断言直接轮询 server.messages /
- * storeSize，不依赖 jest-websocket-mock 的假定时器兼容路径。
+ * 用真实定时器：断言直接轮询 server.messages / storeSize，不依赖
+ * jest-websocket-mock 的假定时器兼容路径。
  */
 
 const accessToken = "p4-lifecycle-token";
@@ -128,7 +128,7 @@ async function connectClient(
   return { server, client, genericHandler };
 }
 
-describe("GenericIncomingMessageHandler dataStore lifecycle (P4)", () => {
+describe("GenericIncomingMessageHandler dataStore lifecycle", () => {
   const snapshot = (
     service: string,
     id: string,
@@ -196,7 +196,7 @@ describe("GenericIncomingMessageHandler dataStore lifecycle (P4)", () => {
   });
 });
 
-describe("subscription stream cleanup (P4)", () => {
+describe("subscription stream cleanup", () => {
   afterEach(() => {
     WS.clean();
     jest.restoreAllMocks();

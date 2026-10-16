@@ -4,15 +4,13 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 存在但未实测成功形状（本地录制
-// 线上实测）：零参数请求也返回 snapshot（空 body），
-// 但真实写参数的形状待按需探测（bundle 挖掘证据）。
+// 服务存在，但真实写参数形状未确认：零参数请求也返回 snapshot（空 body）。
 export type UserPropertiesSetRequestParams = Record<string, unknown>;
 
 export type RawPayloadResponseUserPropertiesSet = Record<string, unknown>;
 
 // 写用户属性（set 版；只读版见 userPropertiesMessageHandler）。
-// ⚠️ 参数形状未实测确认：guest 下空对象即返回 snapshot {}。
+// 参数形状未确认：guest 下空对象即返回 snapshot {}。
 export default class UserPropertiesSetMessageHandler implements WebSocketApiMessageHandler<UserPropertiesSetRequestParams> {
   buildRequest(args: UserPropertiesSetRequestParams): RawPayloadRequest {
     return newPayload({

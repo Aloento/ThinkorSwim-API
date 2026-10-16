@@ -5,13 +5,12 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 画线读服务（drawing 写套的配套）。参数逐字抄自前端 bundle
-// （本地录制）调用点：
+// 画线读服务（drawing 写套的配套）。参数与 id：
 //   drawing_sets  id:`drawing_sets-<n>`  params:{symbol}
 //   drawings      id:`drawings_<guid>`   params:{guid}
-//                 响应 drawings[]（bundle 里逐条按 o.type 分支处理，
-//                 如 Trendline 带 curve{color,...}、startTime/endTime）
-// 线上帧未实测（guest 可读性未探测）。
+//                 响应 drawings[]（按 o.type 分支处理，如 Trendline 带
+//                 curve{color,...}、startTime/endTime）
+// 线上帧未验证（可读性未探测）。
 
 export type DrawingSetsRequestParams = {
   symbol: string;

@@ -80,7 +80,7 @@ describe("order type extension", () => {
     const confirm = new PlaceOrderMessageHandler();
     const submit = new SubmitOrderMessageHandler();
 
-    it("CONFIRM LIMIT（W1 形状回归）：无 tif/tag", () => {
+    it("CONFIRM LIMIT：无 tif/tag", () => {
       const req = confirm.buildRequest({ ...base, limitPrice: 1 });
       expect(req.payload[0].header).toEqual({
         id: "update-draft-order-AAPL",
@@ -123,14 +123,14 @@ describe("order type extension", () => {
         }),
       );
       expect(stopLimit).toMatchObject({
-        // W9b 实测：wire 值是 STOPLIMIT（无下划线），STOP_LIMIT 被拒
+        // wire 值是 STOPLIMIT（无下划线），STOP_LIMIT 被拒
         orderType: "STOPLIMIT",
         stopPrice: 100,
         limitPrice: 101,
       });
     });
 
-    it("CONFIRM 显式 tif 透传；SUBMIT 缺省 tif=DAY + tag=TOSWeb（W2 回归）", () => {
+    it("CONFIRM 显式 tif 透传；SUBMIT 缺省 tif=DAY + tag=TOSWeb", () => {
       const gtcExt = entryOf(
         confirm.buildRequest({ ...base, limitPrice: 1, tif: "GTC_EXT" }),
       );
@@ -161,7 +161,7 @@ describe("order type extension", () => {
       expect(entry).not.toHaveProperty("limitPrice");
     });
 
-    it("EDIT_ORDER + refOrderId（W3 回归），Required<联合> 可赋值", () => {
+    it("EDIT_ORDER + refOrderId，Required<联合> 可赋值", () => {
       const req = submit.buildRequest({
         ...base,
         limitPrice: 2,

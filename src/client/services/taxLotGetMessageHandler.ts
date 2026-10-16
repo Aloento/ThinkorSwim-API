@@ -4,8 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 枚举值全量抄自本地录制
-// 第 2 帧服务端错误帧："Possible enum values are [...]"。
+// taxLotFields 可用枚举（服务端错误帧自曝 "Possible enum values are [...]"）。
 const TAX_LOT_FIELDS = [
   "SYMBOL",
   "OPEN_DATE",
@@ -25,22 +24,21 @@ const TAX_LOT_FIELDS = [
 
 export type TaxLotField = (typeof TAX_LOT_FIELDS)[number];
 
-// 服务端校验（线上错误帧）：
+// 服务端校验：
 //  - taxLotFields 不得为空；
 //  - refreshToken 不得为空串（blank）；
 //  - guest 会话报 "Account lots lookup is not allowed for the current
-//    user"（第 4/5 帧）——真实账户待测。
+//    user"。
 export type TaxLotGetRequestParams = {
-  // 真实账户 code（如 "D-XXXXXXXX"，参照 order_history；probe 用
-  // "COMBINED ACCOUNT" 报的是权限错误，无法区分格式校验，保守用真实 code）
+  // 真实账户 code（如 "D-XXXXXXXX"，参照 order_history）
   account: string;
   symbol: string;
   taxLotFields: TaxLotField[];
-  // 非空串；语义未实测（推测为变更通知 token，空仓时无内容可回）
+  // 非空串；语义未确认（推测为变更通知 token，空仓时无内容可回）
   refreshToken: string;
 };
 
-// 响应成功形状未实测（guest 无权限）。按字段枚举给出宽类型。
+// 成功响应形状未知（guest 无权限）。按字段枚举给出宽类型。
 export type TaxLotItem = Partial<Record<TaxLotField, unknown>> &
   Record<string, unknown>;
 
@@ -50,7 +48,7 @@ export type RawPayloadResponseTaxLotGet = {
   [key: string]: unknown;
 };
 
-// 税则批次（tax lot）查询。guest 账号被服务端拒绝，真实账户待测。
+// 税则批次（tax lot）查询。guest 账号被服务端拒绝。
 export default class TaxLotGetMessageHandler implements WebSocketApiMessageHandler<TaxLotGetRequestParams> {
   buildRequest({
     account,

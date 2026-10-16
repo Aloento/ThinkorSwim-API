@@ -7,19 +7,15 @@ import ResponseParser from "../../client/responseParser";
 import GenericIncomingMessageHandler from "../../client/services/genericIncomingMessageHandler";
 
 /**
- * 2026-10-16 第二个挂死事故的回归测试（Schwab-DCA run 38890309284：dry_run
- * 跑到写单后现金复核时永久挂起，CI 15 分钟后人工取消）。
+ * 服务端持久订阅的回归测试。
  *
- * 根因不是帧分发，而是**服务端订阅存活语义**：
- *   - `statement` 是服务端**持久订阅**：快照之后订阅仍存活，同 `service$id`
- *     的第二次 subscribe 被服务端当作重复订阅**静默忽略**（连 error 帧都没有），
- *     客户端于是永久 await。同一会话里第二次 `getStatement` 必挂；
- *   - 实测对照：先显式 `unsubscribe` 再同 id 重订阅 → 恢复（见 TECHNICAL §9.13）；
- *     位置/订单流同理（DCA 之所以没挂，是因为 for-await 提前 break 会触发退订）；
- *   - `quotes/get` / `accounts` / `market_hours` 等订阅服务端自灭，重复订阅照常回帧。
+ * `statement`/`positions`/`order_events` 是服务端持久订阅：快照之后订阅仍存活，
+ * 同 `service$id` 的重复 subscribe 被服务端当作重复订阅静默忽略（不回帧、
+ * 也不回 error），客户端于是永久 await。因此 Promise 型读取必须 settle 时发
+ * 退订帧；流式订阅提前 break 也会退订。`quotes/get`/`accounts`/`market_hours`
+ * 服务端自灭，重复订阅照常回帧。
  *
- * 下面的假服务端复刻这套语义（持久订阅未退订 → 重复 subscribe 不回帧），
- * 修复前"第二次 getStatement"必然超时失败，修复后干净通过。
+ * 下面的假服务端复刻这套语义（持久订阅未退订 → 重复 subscribe 不回帧）。
  */
 
 const WS_URL = "ws://localhost:9872";
@@ -119,12 +115,10 @@ function bodyFor(h: Header): unknown {
 
 /**
  * 假服务端：`live` 复刻服务端订阅表（key → 建立该订阅的请求帧 JSON）。
- * 返回 false = 本次 subscribe 被服务端当作**重复订阅**静默忽略（不回任何帧）。
- *
- * 抑制条件是"同一持久订阅上收到逐字相同的请求"，这是唯一与全部实测一致的模型：
- *   - statement ×2 / positions ×2（同 ver、同 params）→ 不回帧（线上实测）；
- *   - place_order：CONFIRM → SUBMIT 复用同一草稿 id 但 action/ver 不同 → 照常回帧
- *     （live 实证：同一 id 的 SUBMIT 拿到完成帧 orderId 1008310179618）。
+ * 返回 false = 本次 subscribe 被当作重复订阅静默忽略（不回任何帧）。
+ * 抑制条件是"同一持久订阅上收到逐字相同的请求"：
+ * - statement/positions 同 ver、同 params 重发 → 不回帧；
+ * - place_order 的 CONFIRM→SUBMIT 复用同一草稿 id 但 action/ver 不同 → 照常回帧。
  */
 function makeServer(): {
   server: WS;
@@ -146,7 +140,7 @@ function makeServer(): {
     const key = `${h.service}$${h.id}`;
     const wire = JSON.stringify(request);
     if (PERSISTENT.has(h.service)) {
-      if (live.get(key) === wire) return false; // 重复订阅：静默忽略（事故根因）
+      if (live.get(key) === wire) return false; // 重复订阅：静默忽略
       live.set(key, wire);
     }
     server.send({
@@ -188,7 +182,7 @@ async function authenticate(
   await waitFor(() => client.isConnected());
 }
 
-describe("persistent server subscription (2026-10-16 hang #2)", () => {
+describe("persistent server subscription", () => {
   afterEach(() => {
     WS.clean();
   });
@@ -213,7 +207,7 @@ describe("persistent server subscription (2026-10-16 hang #2)", () => {
         (body.body as { values: { CASH_BALANCE: number } }).values.CASH_BALANCE,
       ).toBe(5);
 
-      // 2) settle 时必须已向服务端退订（修复点；修复前这一帧根本不存在）
+      // 2) settle 时必须已向服务端退订
       const unsub = await waitRequest(
         server,
         "unsubscribe",
@@ -221,7 +215,7 @@ describe("persistent server subscription (2026-10-16 hang #2)", () => {
       );
       expect(serve(unsub)).toBe(true);
 
-      // 3) 第二次读：服务端此时才把它当新订阅（修复前这里永久挂起）
+      // 3) 第二次读：服务端此时才把它当新订阅
       const second = withTimeout(
         client.getStatement(ACCOUNT),
         3000,

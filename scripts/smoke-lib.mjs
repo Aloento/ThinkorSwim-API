@@ -1,6 +1,8 @@
 // 端到端冒烟：用编译后的库 API（RealWsJsonClient）跑 guest paper 会话。
-// 前置：pnpm build 且 scripts/.env.blackbox 有 TOS_GUEST_ACCESS_TOKEN（过期则先跑 auth-guest.mjs）。
-// 验证门面方法在真实服务器上的行为：login→accounts→statement→market_hours→quotes→watchlist→扩展服务(study/scan/quotes/get)→补充服务(news/fundamentals/order_history)。
+// 前置：pnpm build 且 scripts/.env.blackbox 有 TOS_GUEST_ACCESS_TOKEN（过期先跑 auth-guest.mjs）。
+// 覆盖：login→accounts→statement→market_hours→quotes→watchlist（含写闭环）→
+// 扩展服务（study/scan/quotes/get）→补充服务（news/fundamentals/order_history）→事件流订阅。
+// 绝不调用 logoff / demo_account_*：前者终结会话，后者是破坏性资金操作。
 import { config } from "dotenv";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -75,8 +77,8 @@ if (wl) {
   );
 }
 
-// watchlist 成分写闭环：create → add → remove → rearrange → delete
-// （watchlistId 必须用 create 响应返回的真实 id）。
+// watchlist 写闭环：create → add → remove → rearrange → delete。
+// watchlistId 必须用 create 响应返回的真实 id。
 const wlName = `SmokeWL-${Date.now()}`;
 const created = await client.createWatchlist({
   watchlistName: wlName,
@@ -108,14 +110,11 @@ try {
     JSON.stringify(after.body.watchlist?.symbols),
   );
 } finally {
-  // 闭环收尾：无论中间步骤成败都删掉临时 watchlist
+  // 临时 watchlist 无论中间成败都要删掉
   const del = await client.deleteWatchlist(createdId);
   console.log("[smoke] watchlist/delete:", del.service, "ok");
 }
 
-// 扩展服务门面冒烟（guest 实测可达，lead 已在裸 ws 层验证三条全通）：
-// study/categories / scan_filter/get / quotes/get。
-// ⚠️ 绝不在冒烟里调用 logoff / demo_account_*——终结会话、破坏性资金操作。
 const studyCats = await client.getStudyCategories();
 const studyCatCount = studyCats.body.categories?.length ?? 0;
 console.log("[smoke] study/categories: categories=", studyCatCount);
@@ -145,8 +144,7 @@ if (!firstItem?.values) {
   process.exit(1);
 }
 
-// 补充服务门面冒烟：
-// news_headers/get / fundamentals/current / order_history。
+// 补充服务门面：news_headers/get / fundamentals/current / order_history。
 const news = await client.getNews({ symbol: "AAPL", limit: 3 });
 const newsCount = news.body.news?.length ?? 0;
 console.log("[smoke] news_headers/get: news=", newsCount);
@@ -169,8 +167,7 @@ if (!fundamentals.body.values) {
   process.exit(1);
 }
 
-// fundamentals/history：无 time 参数；只收 21 个 historical 字段
-// （guest 实测 snapshot 确认）
+// fundamentals/history：无 time 参数；fields 只接受 21 个 historical 字段
 const hist = await client.getFundamentalsHistory({
   symbol: "AAPL",
   fields: ["EARNINGS_PER_SHARE_TTM"],
@@ -185,7 +182,7 @@ if (!histSeries || Object.keys(histSeries).length === 0) {
   process.exit(1);
 }
 
-// order_history：epoch 秒，窗口 ≤370 天（用近 90 天；paper 账户实测 code）
+// order_history：时间为 epoch 秒，窗口 ≤370 天
 const nowSec = Math.floor(Date.now() / 1000);
 const history = await client.getOrderHistory({
   account: ACCOUNT,
@@ -202,8 +199,8 @@ if (!Array.isArray(history.body.orderHistoryEntries)) {
   process.exit(1);
 }
 
-// 事件流批次：order_events / alerts/subscribe 订阅帧往返。
-// guest 无成交订单——probe 实测 order_events 返回空 body snapshot，断言"帧可达"即可。
+// 事件流订阅：order_events / alerts/subscribe。
+// guest 无成交订单，order_events 只回空 snapshot——断言"帧可达"即可。
 const firstFrame = async (iterable, ms) => {
   const it = iterable[Symbol.asyncIterator]();
   const result = await Promise.race([
@@ -234,8 +231,8 @@ console.log(
     : `service=${al.value?.service}`,
 );
 
-// 第八批：study/subscribe 修通断言——studies 元素必填
-// aggregationPeriod，实测 snapshot {values:{SYMBOL:{studyName:num}}}。
+// study/subscribe：studies 元素必填 aggregationPeriod；
+// snapshot 形状 {values:{SYMBOL:{studyName:num}}}。
 const studyFrame = await firstFrame(
   client.subscribeStudies({
     symbols: ["AAPL"],

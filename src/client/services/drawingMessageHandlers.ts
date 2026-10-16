@@ -4,25 +4,20 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 图表画线服务全套（线上实测：drawing/create、drawing/update、
-// drawing/delete、drawing_set/create、drawing_set/delete）。
+// 图表画线服务全套：drawing/create、drawing/update、drawing/delete、
+// drawing_set/create、drawing_set/delete。
 //
-// 参数双证据：
-// 1) 校验帧（线上实测）：
-//    drawing/create     "$.params.drawingSetGuid: must not be blank;
-//                        $.params.drawing: must not be null"
-//    drawing_set/create "$.params.symbol: must not be blank;
-//                        $.params.name: must not be blank"
-// 2) bundle 调用点（本地录制，逐字核对）：
-//    drawing/create  params:{drawingSetGuid, drawing}   id:"drawing/create"
-//    drawing/update  params:{drawingSetGuid, drawingGuid, drawing}
-//                                                     id:"drawing/update"
-//    drawing/delete  params:{drawingGuid, drawingSetGuid} id:"drawing/delete"
-//    drawing_set/create params:{symbol, name}          id:"drawing_set_create"
-//    drawing_set/delete params:{guid, symbol}          id:"drawing_set_delete"
-// bundle 响应 schema：drawing_set/create → {drawingSet:{guid,name,isDefault}}。
-// drawing 本体的完整结构（trendline/curve/startTime...）guest 无法实测，
-// 按 unknown 建模。
+// 参数与 id：
+//   drawing/create     params:{drawingSetGuid, drawing}   id:"drawing/create"
+//   drawing/update     params:{drawingSetGuid, drawingGuid, drawing}
+//                                                        id:"drawing/update"
+//   drawing/delete     params:{drawingGuid, drawingSetGuid} id:"drawing/delete"
+//   drawing_set/create params:{symbol, name}             id:"drawing_set_create"
+//   drawing_set/delete params:{guid, symbol}             id:"drawing_set_delete"
+// 必填校验：drawing/create 要求 drawingSetGuid 非空、drawing 非 null；
+// drawing_set/create 要求 symbol、name 非空。
+// 响应：drawing_set/create → {drawingSet:{guid,name,isDefault}}。
+// drawing 本体完整结构（trendline/curve/startTime…）未知，按 unknown 建模。
 
 export type DrawingSetItem = {
   guid: string;

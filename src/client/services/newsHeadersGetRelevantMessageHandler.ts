@@ -4,13 +4,12 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 枚举抄自本地录制
-// 错误帧："Possible enum values are [BY_RELEVANCE, BY_TIME]"。
+// sortMode 可用枚举：[BY_RELEVANCE, BY_TIME]。
 const SORT_MODES = ["BY_RELEVANCE", "BY_TIME"] as const;
 
 export type NewsRelevantSortMode = (typeof SORT_MODES)[number];
 
-// 可用参数集合抄自同文件错误帧：
+// 可用参数集合：
 // "Mismatched request parameter name is \"params.symbol\". Available
 // parameters are [sortMode, symbols, account, limit]"——注意是 symbols
 // （复数数组），与 news_headers/get 的 symbol（单数字符串）不同。
@@ -22,9 +21,9 @@ export type NewsHeadersGetRelevantRequestParams = {
 };
 
 // 相关度新闻查询（guest 权限受限：参数全部正确时报
-// "You are not permissioned for personalized news."（isTerminal），见同文件
-// probe-news-rel4 帧——params 按校验帧写全，成功帧待真实账户）。
-// 响应复用 news_headers/get 实测形状 {news: NewsHeaderItem[]}。
+// "You are not permissioned for personalized news."（isTerminal），
+// 成功帧待真实账户）。
+// 响应复用 news_headers/get 形状 {news: NewsHeaderItem[]}。
 export default class NewsHeadersGetRelevantMessageHandler implements WebSocketApiMessageHandler<NewsHeadersGetRelevantRequestParams> {
   buildRequest({
     sortMode,

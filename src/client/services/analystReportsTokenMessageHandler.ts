@@ -4,13 +4,12 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 成功帧实测自本地录制
-// （type: snapshot）：{uuid, accessToken, grantType, refreshIntervalMillis}
-// ——分析师报告第三方服务的访问 token，零参数。
+// 分析师报告第三方服务的访问 token。零参数，
+// 响应 {uuid, accessToken, grantType, refreshIntervalMillis}。
 export type RawPayloadResponseAnalystReportsToken = {
   uuid: string;
   accessToken: string;
-  // 实测值 "Bearer"
+  // "Bearer"
   grantType: string;
   refreshIntervalMillis: number;
 };

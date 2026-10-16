@@ -3,8 +3,8 @@
 > 中文 · [English](README.en.md)
 
 Node 和浏览器可用的 thinkorswim 私有 WebSocket API 客户端。基于上游
-`huskly/tos-wsjson-client` v0.12.0 现代化：pnpm + TypeScript 7 + Node 24，
-全部服务经线上黑盒实测校正。协议细节、服务参数与实测结论见
+`huskly/tos-wsjson-client` v0.12.0 重写：pnpm + TypeScript 7 + Node 24，
+全部服务经黑盒录制校正。协议细节、服务参数与结论见
 [TECHNICAL.md](TECHNICAL.md)。
 
 > ⚠️ 嘉信国际（Charles Schwab International）不提供开发者账户，如需程序化交易
@@ -160,9 +160,9 @@ const client = new RealWsJsonClient({
 
 ## 已知限制
 
-- **碎股（名义额）买单的唯一可靠形状是 MARKET + `legs.quantity` 小数**（live
-  实测定案，TECHNICAL.md §5.2）：无 `AMOUNT` 类型；`isNotional` 是陷阱（CONFIRM
-  阶段必拒，SUBMIT 阶段 paper 接受但按整股成交）；最低 $1、小数位 ≤4。paper 端
+- **碎股（名义额）买单的唯一可靠形状是 MARKET + `legs.quantity` 小数**（TECHNICAL.md
+  §5.3）：无 `AMOUNT` 类型；`isNotional` 是陷阱（CONFIRM 阶段必拒，SUBMIT 阶段 paper
+  接受但按整股成交）；最低 $1、小数位 ≤4；股数 floor 取整使实付 ≤ 计划额。paper 端
   碎股语义与真实端不同，不可用于验证。
 - 部分服务对 guest 会话权限受限（新闻相关性、筛选器、税务批深查等），真实账户
   正常；写类接口按测试纪律未做真实账户自动化。

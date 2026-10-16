@@ -165,6 +165,12 @@ More in `src/example/testApp.ts` and `scripts/smoke-*.mjs`.
 
 ## Known limitations
 
+- **Fractional (notional) buy orders only work reliably as MARKET + a decimal
+  `legs.quantity`** (TECHNICAL.md §5.3): there is no `AMOUNT` order type;
+  `isNotional` is a trap (rejected at CONFIRM, and at SUBMIT the paper endpoint
+  accepts it but fills whole shares); minimum $1 and ≤ 4 decimal places; round
+  quantity with `floor` so the cost never exceeds the planned notional. Paper's
+  fractional semantics differ from live and cannot be used to verify them.
 - Some services are permission-gated for guest sessions (relevant news, screener,
   tax-lot deep lookups); real accounts work. Write endpoints were not automated
   against real accounts by test discipline.

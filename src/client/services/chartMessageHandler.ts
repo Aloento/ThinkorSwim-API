@@ -18,9 +18,9 @@ export type RawPayloadResponseChart = {
   symbol: string;
 };
 
-// 服务端可用参数集合（实测自本地录制错误帧）：
+// 可用参数集合：
 // [priceType, timeAggregation, extendedHours, studies, symbol,
-//  startAtMarketOpen, range, cryptoMidnightUtc, tickAggregation, refreshRate]
+//  startAtMarketOpen, range, cryptoMidnightUtc, tickAggregation, refreshRate]。
 // 发送未知参数名会导致整条请求报 error。
 export type ChartRequestParams = {
   symbol: string;
@@ -33,8 +33,8 @@ export type ChartRequestParams = {
   startAtMarketOpen?: boolean;
   cryptoMidnightUtc?: boolean;
   refreshRate?: number;
-  /** P7：订阅 id，默认 "chart-page-chart-1"。并发订阅多标的
-   *  时应传不同 id，否则按 id 路由的响应会合并到同一订阅（语义）。 */
+  /** 订阅 id，默认 "chart-page-chart-1"。并发订阅多标的应传不同 id，
+   *  否则按 id 路由的响应会合并到同一订阅。 */
   id?: string;
 };
 
@@ -51,8 +51,7 @@ export default class ChartMessageHandler implements WebSocketApiMessageHandler<C
     refreshRate,
     id,
   }: ChartRequestParams): RawPayloadRequest {
-    // params 只包含服务端可用参数集合内的键；未提供的可选键不发送，
-    // 避免以 null/未知键形式污染请求。
+    // 只发可用参数集合内的键；未提供的可选键不发送（避免 null/未知键）。
     const params: Record<string, any> = {
       symbol,
       timeAggregation,

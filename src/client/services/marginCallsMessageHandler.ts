@@ -4,8 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 实测自本地录制（type: snapshot）。
-// 实测时 marginCalls 均为空数组，元素结构未观测到，故为 unknown[]。
+// marginCalls 均为空数组，元素结构未观测到，故为 unknown[]。
 export type RawMarginAccountsDataItem = {
   account: string;
   marginCalls: unknown[];
@@ -15,7 +14,7 @@ export type RawPayloadResponseMarginCalls = {
   marginAccountsDataItems: RawMarginAccountsDataItem[];
 };
 
-// 保证金追缴列表。params 实测为空对象。
+// 保证金追缴列表。params 为空对象。
 export default class MarginCallsMessageHandler implements WebSocketApiMessageHandler<void> {
   buildRequest(_: void): RawPayloadRequest {
     return newPayload({

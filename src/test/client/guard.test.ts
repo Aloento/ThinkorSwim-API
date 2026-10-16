@@ -242,11 +242,11 @@ describe("guard 安全闸门（拦截矩阵）", () => {
     }
   });
 
-  it("notional（碎股名义额）矩阵：美元额可知即按 USD 校验，不再要求 limitPrice", () => {
+  it("notional（碎股名义额）矩阵：美元额可知即按 USD 校验，不要求 limitPrice", () => {
     // 与 afterEach 的假定时器推进对齐（纯断言用例，同 GuardError 用例做法）
     jest.useFakeTimers();
     // 直接测 OrderGuard 语义：notionalUsd 是纯闸门输入（美元额=下单意图），
-    // 与 wire 形状无关——AMOUNT 的 wire 类型待 W11 录帧后另加。
+    // 与 wire 形状无关。
     const guard = new OrderGuard(
       { maxQuantity: 50, maxNotionalUsd: 800 },
       true,
@@ -268,7 +268,6 @@ describe("guard 安全闸门（拦截矩阵）", () => {
       /maxQuantity/,
     );
     // 达标：$1.65 碎股买（碎股 qty，无 limitPrice）→ 放行
-    // （旧实现会因"无 limitPrice"一律误拒，碎股定投走不通）
     expect(() =>
       guard.validateOrder("submitOrder", fractional(1.65)),
     ).not.toThrow();

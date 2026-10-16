@@ -1,13 +1,13 @@
 // guestpass 认证辅助（纯协议侧，不依赖 puppeteer——浏览器注入式，调用方传 page）。
 //
-// 实测流程（TECHNICAL.md）：
+// 流程：
 //   表单登录 → sws-gateway auth/login+assert → 302 /oauth?code=X
 //   → 前端 POST tosweb-sm…/tsm/authorize {authCode:X, clientId}
 //   → 201 {authCode:Y,…}   ← Y 是 wsjson login/schwab 要用的 code
-// 本模块的职责：在浏览器导航过程中截获 tsm/authorize 的 201 响应，
-// 返回 {authCode, clientId}；wsjson 登录仍走 WsJsonClient.authenticateWithAuthCode。
+// 本模块截获 tsm/authorize 的 201 响应，返回 {authCode, clientId}；
+// wsjson 登录仍走 WsJsonClient.authenticateWithAuthCode。
 //
-// 浏览器对象类型刻意用最小结构（duck typing），避免把 puppeteer 变成运行时依赖。
+// 浏览器对象类型用最小结构（duck typing），不引入 puppeteer 运行时依赖。
 
 /** puppeteer Page 的最小必需面（createCDPSession 不需要）。 */
 export interface BrowserPage {
@@ -131,7 +131,7 @@ export async function harvestSessionToken(browserLike: {
   return null;
 }
 
-/** PaperMoney 会话必须连 papermoney 数据中心（token 与 DC 绑定，见 TECHNICAL.md F1）。 */
+/** PaperMoney 会话必须连 papermoney 数据中心（token 与 DC 绑定）。 */
 export function wsUrlForTradingSystem(tradingSystem?: string): string {
   return tradingSystem === "PaperMoney"
     ? "wss://papermoney-services.schwab.com/Services/WsJson"

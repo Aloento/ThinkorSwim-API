@@ -63,7 +63,8 @@ export default class PositionsMessageHandler implements WebSocketApiMessageHandl
       params: {
         account: accountNumber,
         betaWeightingSymbols: [],
-        //additional fields are: MARK DELTA GAMMA THETA VEGA RHO OPEN_COST BP_EFFECT MARK_CHANGE MARGIN
+        // fields 另可用: MARK DELTA GAMMA THETA VEGA RHO OPEN_COST BP_EFFECT
+        // MARK_CHANGE MARGIN
         fields: [
           "QUANTITY",
           "OPEN_PRICE",

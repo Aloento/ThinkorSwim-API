@@ -6,9 +6,8 @@ import WebSocketApiMessageHandler, {
 } from "./webSocketApiMessageHandler.js";
 import type { WatchlistModifyRequestParams } from "./watchlistAddMessageHandler.js";
 
-// 实测自本地录制第 3 帧：
 // 请求参数与 watchlist/add 相同 [watchlistId, symbols]；
-// 响应返回删除后**合并**的 watchlist（["AAPL","SPY"]，TSLA 已移除）。
+// 响应返回删除后**合并**的 watchlist。
 export type RawPayloadResponseWatchlistRemove = {
   watchlist: GetWatchListResponseItem;
 };

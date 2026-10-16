@@ -4,8 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 请求参数实测自本地录制：
-// 发送 params.exchanges 时服务端报错，可用参数集合为 [date, markets]。
+// 可用参数仅 [date, markets]；传 params.exchanges 服务端报错。
 export type MarketHoursRequestParams = {
   markets: string[];
   date: string;
@@ -18,20 +17,20 @@ export type MarketSessionHours = {
 
 export type MarketHoursProductEntry = {
   date: string;
-  // 实测值: "EQUITY" | "OPTION" | "FUTURE"
+  // "EQUITY" | "OPTION" | "FUTURE"
   marketType: string;
   product: string;
   productName: string;
   isOpen: boolean;
-  // 仅 FUTURE 实测携带，如 "XCME" | "XCEC"
+  // 仅 FUTURE 携带，如 "XCME" | "XCEC"
   exchange?: string;
-  // 仅 FUTURE 实测携带，如 "Futures"
+  // 仅 FUTURE 携带，如 "Futures"
   category?: string;
-  // 实测 key: "preMarket" | "regularMarket" | "postMarket" | "noTrading"
+  // key: "preMarket" | "regularMarket" | "postMarket" | "noTrading"
   sessionHours: Record<string, MarketSessionHours[]>;
 };
 
-// 实测结构: body.schwabMarketHours[marketType][product] = entry
+// 结构: body.schwabMarketHours[marketType][product] = entry
 // 例如 EQUITY.EQ / OPTION.EQO / FUTURE.ADA
 export type RawPayloadResponseMarketHours = {
   schwabMarketHours: Record<string, Record<string, MarketHoursProductEntry>>;

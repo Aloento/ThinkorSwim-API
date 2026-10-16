@@ -11,27 +11,22 @@ import WebSocketApiMessageHandler, {
 export type SubmitDraftOrderRequestParams = PlaceOrderRequestParams;
 
 // 改单：refOrderId 必填（区别于提交草稿的新单）。
-// 注意不要用 Required<PlaceOrderRequestParams>——Required 对判别联合的
+// 不用 Required<PlaceOrderRequestParams>——Required 对判别联合的
 // `limitPrice?: never` 会变成必填 never（不可构造），改为交集收紧 refOrderId。
 export type ReplaceOrderRequestParams = PlaceOrderRequestParams & {
   refOrderId: number;
 };
 
-// 提交订单草稿（新单）或修改已存在的订单（带 refOrderId）。
-//
-// 实测（scripts/probe-write.mjs W2/W3 用例）：
-// - 新单（W2）：action=SUBMIT ver=0，header 必须复用 CONFIRM 的草稿 id
-//   （update-draft-order-<SYMBOL>）；换 id 报
-//   "Can not submit while prices are not available!"。
-//   requestType=INIT_STOCK，带 tif/tag。orderId 不在 snapshot 里，而是
-//   SUBMIT 后经 patch /orders/0/orderId 返回。
-// - 改单（W3）：action=SUBMIT ver=0，header.id 是新造的
-//   edit-order-<SYMBOL>（编辑不是草稿续写，不要求复用下单草稿 id），
-//   订单条目 requestType=EDIT_ORDER 且携带 refOrderId。
-// orderType/limitPrice/stopPrice/tif 与 CONFIRM 共用 buildPlaceOrderEntry
-// （MARKET/STOP/STOP_LIMIT 扩展）；SUBMIT 缺省 tif=DAY +
-// tag=TOSWeb（W2 实测形状）。
-// ⚠️ MARKET 单 SUBMIT 会立即成交——下单前确认。
+// 提交订单草稿（新单）或修改已存在的订单（带 refOrderId）。action=SUBMIT，ver=0。
+// - 新单：header 必须复用 CONFIRM 的草稿 id（update-draft-order-<SYMBOL>）；
+//   换 id 报 "Can not submit while prices are not available!"。
+//   requestType=INIT_STOCK，带 tif/tag。orderId 不在 snapshot 里，而是 SUBMIT
+//   后经 patch /orders/0/orderId 返回。
+// - 改单：header.id 是新造的 edit-order-<SYMBOL>（编辑不是草稿续写，不要求
+//   复用下单草稿 id），订单条目 requestType=EDIT_ORDER 且携带 refOrderId。
+// orderType/limitPrice/stopPrice/tif 与 CONFIRM 共用 buildPlaceOrderEntry；
+// SUBMIT 缺省 tif=DAY + tag=TOSWeb。
+// MARKET 单 SUBMIT 会立即成交——下单前确认。
 export default class SubmitOrderMessageHandler implements WebSocketApiMessageHandler<PlaceOrderRequestParams> {
   buildRequest(params: PlaceOrderRequestParams): RawPayloadRequest {
     const { symbol, refOrderId } = params;

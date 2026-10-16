@@ -39,7 +39,7 @@ export class WebSocketApiError extends Error {
   }
 }
 
-/** 认证/握手层失败（login 被拒、缺少凭据等）。替代旧的字符串 reject（R6）。 */
+/** 认证/握手层失败（login 被拒、缺少凭据等）。 */
 export class AuthError extends Error {
   constructor(message: string) {
     super(message);
@@ -47,7 +47,7 @@ export class AuthError extends Error {
   }
 }
 
-/** 传输层失败（连接断开、握手超时、心跳看门狗判死、状态机冲突等）。替代旧的字符串 reject（R6）。 */
+/** 传输层失败（连接断开、握手超时、心跳看门狗判死、状态机冲突等）。 */
 export class TransportError extends Error {
   constructor(message: string) {
     super(message);

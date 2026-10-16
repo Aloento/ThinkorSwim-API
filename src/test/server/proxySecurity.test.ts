@@ -3,7 +3,7 @@ import WsJsonServerProxy from "../../server/wsJsonServerProxy";
 import { WsJsonClient } from "../../client/wsJsonClient";
 import { ParsedPayloadResponse } from "../../client/tdaWsJsonTypes";
 
-// S1/S3代理安全闸门单测：token 鉴权 + request 白名单。
+// 代理安全闸门单测：token 鉴权 + request 白名单。
 // 用假 downstream（WsJsonServerProxy 只依赖 on/send/close），避免真实
 // 端口与计时器；upstream 用最小 fake 客户端。
 

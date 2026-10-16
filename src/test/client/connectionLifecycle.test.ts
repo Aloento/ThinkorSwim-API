@@ -16,9 +16,9 @@ import {
 } from "../../client/tdaWsJsonTypes";
 
 /**
- * 任务6（R2/R3/R4/R6）：重连退避、心跳看门狗、订阅重放、握手超时、
- * Error 对象化。使用 jest.useFakeTimers + socketFactory 注入 mock 全局
- * WebSocket（重连必须走工厂新建 socket，构造注入只供首轮）。
+ * 重连退避、心跳看门狗、订阅重放、握手超时、Error 对象化。使用
+ * jest.useFakeTimers + socketFactory 注入 mock 全局 WebSocket（重连必须走
+ * 工厂新建 socket，构造注入只供首轮）。
  *
  * mock-socket 的 open/客户端 close/send 事件经 setTimeout(4ms) 派发，
  * server.close() 则同步派发——配合假定时器统一用 advanceTimersByTimeAsync
@@ -324,7 +324,7 @@ describe("connectionLifecycle", () => {
       reconnectBackoffInitialMs: 100,
     });
     try {
-      // 首轮：服务端接受连接但从不回 connectionResponse → 握手超时（R6）。
+      // 首轮：服务端接受连接但从不回 connectionResponse → 握手超时。
       // 从未认证成功过 → 超时后不自动重连（不无限烧连接）。
       const auth = track(client.authenticateWithAccessToken({ accessToken }));
       await jest.advanceTimersByTimeAsync(1_000);
@@ -336,7 +336,7 @@ describe("connectionLifecycle", () => {
       expect(client.isConnecting()).toBe(false);
       await jest.advanceTimersByTimeAsync(60_000);
 
-      // 登录失败：AuthError（R6：替代旧的字符串 reject），同样不自动重试
+      // 登录失败：AuthError，同样不自动重试
       const base = server.messages.length;
       const auth2 = track(client.authenticateWithAccessToken({ accessToken }));
       await expectMessageAt(server, base, CONNECTION_REQUEST_MESSAGE);

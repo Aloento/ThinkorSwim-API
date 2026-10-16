@@ -1,18 +1,17 @@
 // 真实账户 Authenticator 端到端续期回归（一次性 refreshToken 轮换）。
 //
-// 关键口径（真实账户端到端实测）：
-// - refreshToken 只在 F2A 时勾选"信任设备"才签发（用户确认）；随后
-//   login/schwab 帧 accessTokenInfo.refreshToken 出现（CDP 抓到，len≈248~268）。
-// - access_token/get（scope="api"）成功轮换：返回 {accessExpiresIn:86400,
-//   accessToken, refreshToken}，accessToken 是 EAT（855 字符，"S0." 前缀），
-//   **不是** wsjson login 帧用的 32 字符 session token（"x7gn…"）。EAT 供
-//   EAT 鉴权的 REST/其他系统；拿它去 login 帧会报 NOT_AUTHORIZED: Invalid
-//   token (server session id)。二者是不同 token，各司其职。
+// 关键口径：
+// - refreshToken 只在 F2A 时勾选"信任设备"才签发，出现在 login/schwab 帧的
+//   accessTokenInfo.refreshToken。
+// - access_token/get（scope="api"）轮换返回 {accessExpiresIn:86400, accessToken, refreshToken}。
+//   accessToken 是 EAT（约 855 字符，"S0." 前缀），供 EAT 鉴权的 REST 使用；
+//   它**不是** wsjson login 帧的 32 字符 session token（"x7gn…"），
+//   拿 EAT 去 login 会报 NOT_AUTHORIZED: Invalid token (server session id)。
 // - refreshToken 一次性：每次轮换旧的立即失效，必须持久化新值。
 //
-// 本脚本证明续期通道端到端可用：强制到期 → 缺省通道（getAccessToken，
-// DEFAULT_REFRESH_SCOPE="api"）→ 断言轮换出新 EAT + 新 RT → 用新 RT 再续一次
-// （链式，证明新 RT 已激活）→ 落盘 EAT(TOS_REAL_EAT_ACCESS_TOKEN) 与最新 RT；
+// 流程：强制到期 → 缺省通道（getAccessToken，DEFAULT_REFRESH_SCOPE="api"）→
+// 断言轮换出新 EAT + 新 RT → 用新 RT 再续一次（链式，证明新 RT 已激活）→
+// 落盘 EAT(TOS_REAL_EAT_ACCESS_TOKEN) 与最新 RT。
 // **不动** TOS_REAL_ACCESS_TOKEN（32 字符 session token），smoke-real 继续可用。
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";

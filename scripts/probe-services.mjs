@@ -1,8 +1,8 @@
-// 黑盒服务普查 runner：登录 paper 会话后逐个请求服务并录制原始帧。
+// 黑盒服务普查 runner：登录 paper 会话后逐个请求服务并录制原始帧（错误帧同样录制）。
 // 用法: node scripts/probe-services.mjs [service ...]   # 不传参数=全量
-// 依赖 scripts/.env.blackbox 里的 TOS_GUEST_ACCESS_TOKEN / TOS_GUEST_WS_URL
-// 需要具体账户代码的用例读 TOS_PAPER_ACCOUNT（缺省退 "COMBINED ACCOUNT" 占位，
-// 该组用例可能收到校验错误帧——探针本就录制错误帧，不影响其余用例）。
+// 依赖 scripts/.env.blackbox 的 TOS_GUEST_ACCESS_TOKEN / TOS_GUEST_WS_URL。
+// 需账户代码的用例读 TOS_PAPER_ACCOUNT，缺省用 "COMBINED ACCOUNT" 占位，
+// 该组可能因此返回校验错误帧。
 import { mkdirSync, writeFileSync, appendFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -90,7 +90,7 @@ function connect() {
   });
 }
 
-// 每个服务的探测请求（来自前端真实流量 + 既有代码）
+// 探测请求集：服务名/参数来自前端真实流量与既有代码
 const PROBES = [
   {
     service: "user_properties",
@@ -377,7 +377,6 @@ const PROBES = [
     },
     waitMs: 4000,
   },
-  // —— bundle 挖掘 + 错误帧参数修正（第二轮）——
   {
     service: "news_headers/get",
     id: "probe-news-headers",
@@ -397,7 +396,7 @@ const PROBES = [
   {
     service: "fundamentals/history",
     id: "probe-fund-hist",
-    // 实测（fund-hist-findings.md）：无 time 参数；fields 只收 21 个 historical 字段
+    // 无 time 参数；fields 只接受 21 个 historical 字段
     params: {
       symbol: "AAPL",
       fields: ["EARNINGS_PER_SHARE_TTM", "SALES_PER_SHARE"],
@@ -454,7 +453,7 @@ const PROBES = [
   {
     service: "transactions/categories",
     id: "probe-txn-cats",
-    // 真实账户实测需 6 参数（exp-tc.mjs）；guest 仍可能校验错误
+    // 真实账户需 6 参数；guest 下仍可能返回校验错误
     params: {
       account: "COMBINED ACCOUNT",
       startTime: Math.floor(Date.now() / 1000) - 30 * 24 * 3600,
@@ -488,7 +487,7 @@ const PROBES = [
     params: { watchlistId: 999999, symbols: ["ZZZZ"] },
     waitMs: 3000,
   },
-  // —— bundle 全量 slash-name 清单的剩余候选（第三轮）——
+  // bundle 提取的 slash-name 候选服务
   {
     service: "quotes/get",
     id: "probe-qget",
@@ -539,7 +538,6 @@ const PROBES = [
   },
   { service: "access_token/get", id: "probe-atoken", params: {}, waitMs: 3000 },
   { service: "auth_code/get", id: "probe-acode", params: {}, waitMs: 3000 },
-  // ⚠️ logoff/schwab 存在（bundle 确认）但会终止会话，禁止加入矩阵；单独手动验证。
   {
     service: "drawing/create",
     id: "probe-draw-create",
@@ -564,8 +562,7 @@ const PROBES = [
     params: {},
     waitMs: 2500,
   }, // 空参只验存在性
-  // ⚠️ logoff/schwab 会终止本会话——从常规矩阵移除，只允许单独手动跑
-  // —— 第四轮：形状确认（成功帧，参数按错误帧枚举修正）——
+  // logoff/schwab 会终止本会话，不入常规矩阵，只允许单独手动跑
   {
     service: "quotes/get",
     id: "probe-qget4",

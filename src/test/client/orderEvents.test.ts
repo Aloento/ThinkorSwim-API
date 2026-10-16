@@ -24,11 +24,11 @@ import { ParsedPayloadResponse } from "../../client/tdaWsJsonTypes";
  * iterable、workingOrders 查表派发。全 mock（jest-websocket-mock），无网络。
  */
 
-// ---- A) 归一化纯函数（状态映射表逐一对齐前端 bundle 的 cp()） ----
+// ---- A) 归一化纯函数 ----
 
 describe("normalizeOrderStatus（wire status → 归一枚举）", () => {
   it.each([
-    // WORKING 家族（前端 cp 的 switch 分组）
+    // WORKING 家族
     ["WORKING", "WORKING"],
     ["ACCEPTED", "WORKING"],
     ["QUEUED", "WORKING"],
@@ -69,7 +69,7 @@ describe("normalizeOrderStatus（wire status → 归一枚举）", () => {
     expect(normalizeOrderStatus(raw)).toBe(expected);
   });
 
-  it("大小写不敏感 + 子串嗅探兜底（bundle cp 的 default 分支）", () => {
+  it("大小写不敏感 + 子串嗅探兜底", () => {
     expect(normalizeOrderStatus("working")).toBe("WORKING");
     expect(normalizeOrderStatus("partially_working")).toBe("WORKING");
     expect(normalizeOrderStatus("PARTIALLY_FILLED")).toBe("FILLED");
@@ -294,7 +294,7 @@ describe("RealWsJsonClient.orderEvents / observeOrders", () => {
     jest.restoreAllMocks();
   });
 
-  it("orderEvents 发出线上实测形状的订阅帧（id=order_events + 默认 types）", async () => {
+  it("orderEvents 订阅帧形状（id=order_events + 默认 types）", async () => {
     jest.useFakeTimers();
     const { server, client } = setup(ORDER_EVENTS_URL);
     try {
@@ -307,7 +307,7 @@ describe("RealWsJsonClient.orderEvents / observeOrders", () => {
           account: "IND-D100579QZ",
         }),
       );
-      // 与前端线上请求帧一致
+      // 与前端请求帧一致
       expect(
         (
           server.messages[2] as {
@@ -331,7 +331,7 @@ describe("RealWsJsonClient.orderEvents / observeOrders", () => {
       collect(client.observeOrders("ACC"), normalized);
       await waitFor(() => server.messages.length >= 3);
 
-      // 一帧两条事件（snapshot 批量是 wire 常态）
+      // 一帧两条事件（snapshot 批量是常态）
       server.send(
         orderEventsFrame([
           rawEvent({ status: "ACCEPTED" }),

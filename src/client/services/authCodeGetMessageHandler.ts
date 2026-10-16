@@ -4,23 +4,19 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 必填校验抄自本地录制：
-// "$.params.issuedTo: must not be blank; $.params.refreshToken: must not
-// be blank; $.params.appliesTo: must not be blank"。guest 无 refreshToken，
-// 成功帧未实测。
-//
-// bundle 枚举名 EXCHANGE_RT_FOR_AUTH_CODE 佐证语义：refreshToken 换一次性
-// auth code（可再走 authenticateWithAuthCode / REST 换全套 token）。
+// 必填校验："$.params.issuedTo: must not be blank; $.params.refreshToken: must
+// not be blank; $.params.appliesTo: must not be blank"。
+// refreshToken 换一次性 auth code（bundle 枚举名 EXCHANGE_RT_FOR_AUTH_CODE），
+// code 可再走 authenticateWithAuthCode / REST 换全套 token。
 
 export type AuthCodeGetRequestParams = {
-  // 授权目标（bundle 语义：issuedTo/appliesTo 为账户或主体标识，
-  // 具体取值 guest 未实测）
+  // 授权目标：issuedTo/appliesTo 为账户或主体标识，具体取值未验证
   issuedTo: string;
   refreshToken: string;
   appliesTo: string;
 };
 
-// 响应形状抄自 bundle 校验 schema（auth_code/get 的响应 schema：{code}）。
+// 响应：{code}
 export type RawPayloadResponseAuthCodeGet = {
   code: string;
 };

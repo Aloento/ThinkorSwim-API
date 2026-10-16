@@ -1,21 +1,14 @@
-// 真实账户登录工具 v2（默认无头：F2A 渠道自动选择——优先"Send a mobile
-// notification"手机上点批准，页面自己轮询；无该渠道退回"Text Message"，
-// 验证码在终端回传；自动勾选"信任设备"以签发 refreshToken）。
-// 协议同 auth-guest.mjs（TECHNICAL.md §认证链路）：
-//   1. https://trade.thinkorswim.com/ 账密登录（sws-gateway），随后 F2A
-//   2. 前端 tsm/authorize → wsjson login/schwab
-//   3. 收割 sessionStorage.token + login/schwab 响应里的 accessTokenInfo
-//      （真实账户应含 refreshToken——Authenticator 端到端回归的关键证据）
+// 真实账户登录工具：默认无头，F2A 渠道自动选择——优先 "Send a mobile
+// notification"（页面自行轮询手机批准），无该渠道退回 "Text Message"（终端回传码）；
+// 自动勾选"信任设备"——refreshToken 只在该条件下签发。
+// 链路同 auth-guest.mjs：账密登录（sws-gateway）→ F2A → tsm/authorize → wsjson login/schwab；
+// 收割 sessionStorage.token，并从页面 login/schwab 帧取 accessTokenInfo.refreshToken。
 // 用法: node scripts/auth-real.mjs [--headed] [--profile <dir>]
-//   默认无头（Chrome new headless，实测与有头指纹逐信号一致，stealth 抹平
-//   webdriver/UA 后即与历史成功登录同指纹，不做手写覆盖）；--headed 回退有头
-//   人工模式（v1 行为：弹窗后全人工完成 F2A）。
-//   --profile：Chrome userDataDir（= "信任设备"本体）。服务器部署必须指到
-//   持久目录（如 /home/ghrunner/tos-state/chrome-profile），否则 profile 丢
-//   = 新设备 = 重新人工 F2A。缺省 scripts/puppeteer-data-real（本地开发）。
+//   --headed：有头人工完成 F2A。
+//   --profile：Chrome userDataDir，即"信任设备"的载体。服务器须指向持久目录，
+//   profile 丢失 = 新设备 = 重新人工 F2A。缺省 scripts/puppeteer-data-real。
 // 凭证: .env.blackbox 的 TOS_REAL_USER / TOS_REAL_PASS
-// F2A: 无头模式自动选渠道；mobile 渠道等你手机上批准、SMS 渠道在终端输码，
-//      共最多 5 分钟。
+// F2A 等待上限：5 分钟。
 import { mkdirSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
 import { dirname, join } from "node:path";
@@ -29,19 +22,15 @@ const here = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: join(here, ".env.blackbox") });
 
 const HEADLESS = !process.argv.includes("--headed");
-// Chrome userDataDir：--profile <dir> 可指向持久目录（"信任设备"持久化的前提）
+// Chrome userDataDir：--profile <dir> 指定持久目录，"信任设备"依赖它存活
 const profileIdx = process.argv.indexOf("--profile");
 const PROFILE_DIR =
   profileIdx >= 0 && process.argv[profileIdx + 1]
     ? process.argv[profileIdx + 1]
     : join(here, "puppeteer-data-real");
-// 指纹策略（exp-fp.mjs 矩阵实测结论）：Chrome 155 的 new headless 与有头
-// 指纹逐信号一致，唯二差异 navigator.webdriver=true 与 UA 里的
-// "HeadlessChrome" token 都由 stealth 的默认 evasion 消除；其余（platform/
-// UA-CH brands+highEntropy/plugins/WebGL/chrome 对象）无头有头本就相同。
-// 因此用**默认 stealth**（与历史成功的有头登录同指纹），不做任何手写
-// UA/UA-CH/时区覆盖——那些反而制造内部不一致（手写值与真实 Chrome 的
-// platformVersion/brand 版本对不上，正是风控抓的点）。
+// 指纹口径：Chrome new headless 与有头指纹一致，差异仅 navigator.webdriver
+// 与 UA 里的 "HeadlessChrome"，stealth 默认 evasion 即消除。因此用默认 stealth，
+// 不做手写 UA/UA-CH/时区覆盖——手写值与真实 Chrome 的内部字段对不齐，反而触发风控。
 puppeteer.use(StealthPlugin());
 
 const USER = process.env.TOS_REAL_USER;
@@ -63,8 +52,7 @@ const safe = async (fn) => {
 const artDir = join(here, "artifacts");
 mkdirSync(artDir, { recursive: true });
 const captured = []; // login/authorize 相关响应（落盘前统一脱敏）
-// 脱敏：任何敏感键只留长度占位，值一律不落盘（artifacts 虽 gitignore，
-// 仍按"仓库工作区零敏感明文"纪律处理）
+// 脱敏：敏感键只留长度占位。artifacts 虽 gitignore，仍按"工作区零敏感明文"处理。
 const SENSITIVE_KEYS =
   /^(token|authCode|code|eat|refreshToken|accessToken|password|passwd|newT)$/i;
 function redact(node) {
@@ -86,14 +74,12 @@ let rl = null; // readline（终端回传短信码用，延迟创建；finally �
 
 async function main() {
   const browser = await puppeteer.launch({
-    // true = Chrome new headless（109+，与有头同一渲染栈；exp-fp.mjs 实测
-    // Chrome 155 无头/有头指纹逐信号一致，stealth 抹平 webdriver/UA 后即与
-    // 历史成功登录同指纹）；--headed 回退 v1 人工模式
+    // true = Chrome new headless（与有头同一渲染栈）；--headed 回退人工模式
     headless: HEADLESS,
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
-      // 小内存服务器（/dev/shm 常为 RAM 一半甚至更小）：不落 shm，否则 Chrome 崩
+      // 小内存服务器 /dev/shm 可能小于 RAM 一半，不落 shm 否则 Chrome 崩
       "--disable-dev-shm-usage",
       "--window-size=1280,900",
     ],
@@ -131,8 +117,8 @@ async function main() {
           console.log("tsm/authorize 201: keys=%s", Object.keys(tsm).join(","));
       }
     });
-    // 抓 wsjson WS 帧里的 login/schwab 响应（accessTokenInfo.refreshToken
-    // 只在该帧里；token 方式的 login 响应没有——本轮实测证实）
+    // CDP webSocketFrameReceived 抓 wsjson 帧：refreshToken 只出现在页面
+    // login/schwab 帧，token 方式的 login 响应不下发它。
     page.on("wsresponse", () => {});
     const cdp = await page.createCDPSession();
     await cdp.send("Network.enable").catch(() => {});
@@ -163,10 +149,7 @@ async function main() {
     });
     await sleep(3000);
 
-    // 账密自动代填（guest 同款循环）。F2A 处理分两种模式：
-    //  --headed：v1 行为，弹窗后全人工（sawF2A 只提示不动手）。
-    //  无头（默认）：自动点选渠道（优先移动推送，退回短信+终端回传码），
-    //               自动勾"信任设备"（refreshToken 的前提）。
+    // 账密自动代填。F2A：--headed 全人工；无头自动选渠道并勾"信任设备"。
     let sawF2A = false;
     let f2aMode = null; // 'mobile' | 'sms' | 'headed'
     const askTerminal = async (q) => {

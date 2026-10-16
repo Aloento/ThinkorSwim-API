@@ -1,9 +1,10 @@
-// 黑盒写操作用例（W 组），仅纸面账户。仅连 papermoney-services；拒绝连真实端点。
+// 黑盒写操作用例（W 组），仅限纸面账户。
 // 用法: node scripts/probe-write.mjs <W1|W2|W3|W4|W6|W7|W8|W9|W9b|W10|W11>
-// 安全闸门：数量=1、限价=$1（远离市价，绝不成交）、标的白名单 AAPL、只连 paper。
-// W8/W9/W10/W11：⚠️ 只发 CONFIRM(ver:1)，永不 SUBMIT——MARKET 单
-// SUBMIT 会立即成交；期权腿用 option_chain/get 的真实合约 + $0.01 深虚值。
-// 账户代码不硬编码：优先 TOS_PAPER_ACCOUNT，否则登录后从 accounts 现取 D- 开头项。
+// 安全闸门：只连 papermoney 端点（非 paper 直接退出）；数量=1；限价 $1 远离市价，
+// 绝不到来；标的白名单 AAPL；账户代码不硬编码——优先 TOS_PAPER_ACCOUNT，
+// 否则登录后从 accounts 现取 D- 开头项。
+// W8/W9/W10/W11 只发 CONFIRM(ver:1)，永不 SUBMIT：MARKET 单 SUBMIT 会立即成交。
+// 期权腿用 option_chain/get 的真实合约 + $0.01 深虚值。
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { appendFileSync, mkdirSync } from "node:fs";
@@ -322,7 +323,7 @@ async function main() {
       await sleep(8000);
       break;
 
-    case "W5": // watchlist 写：create→rename→delete（错误帧会暴露参数名）
+    case "W5": // watchlist 写：create 后列 PERSONAL 分类读回
       send(ws, "watchlist/create", "probe-wl-create", {
         watchlistName: "ProbeWL",
         symbols: ["AAPL", "SPY"],
@@ -334,7 +335,7 @@ async function main() {
       await sleep(4000);
       break;
 
-    case "W5b": // watchlist add_symbols / rename / delete（参数名由错误帧暴露）
+    case "W5b": // watchlist add_symbols / rename / delete
       {
         const wlId = Number(process.argv[3]);
         if (!wlId) {
@@ -363,7 +364,7 @@ async function main() {
       }
       break;
 
-    case "W5c": // 变更 watchlist 成分：变体名探测（错误帧自曝正确名字）
+    case "W5c": // watchlist 成分变更：候选服务名探测（错误帧自曝正确名字）
       {
         const wlId = Number(process.argv[3] || "1222638069");
         const cases = [
@@ -393,7 +394,7 @@ async function main() {
       }
       break;
 
-    case "W5d": // 假设：create 带 id 即覆盖保存（前端常这样实现 upsert）
+    case "W5d": // 验证 create 带 id 是否即覆盖保存（upsert）
       {
         const wlId = Number(process.argv[3]);
         if (!wlId) {
@@ -411,7 +412,7 @@ async function main() {
       }
       break;
 
-    case "W5e": // 再试成分变更候选名，最后 delete 清理
+    case "W5e": // watchlist 成分变更候选名（续），最后 delete 清理
       {
         const wlId = Number(process.argv[3]);
         if (!wlId) {
@@ -452,7 +453,7 @@ async function main() {
       }
       break;
 
-    case "W5f": // bundle 挖掘：成分修改疑似 watchlist/add + watchlist/remove
+    case "W5f": // 成分修改：watchlist/add + watchlist/remove + rearrange
       {
         const wlId = Number(process.argv[3]);
         if (!wlId) {
@@ -482,7 +483,7 @@ async function main() {
       }
       break;
 
-    case "W8": // CONFIRM MARKET（⚠️ 只 CONFIRM，绝不 SUBMIT——市价单会立即成交）
+    case "W8": // CONFIRM MARKET：只 CONFIRM 绝不 SUBMIT——市价单会立即成交
       send(
         ws,
         "place_order",
@@ -605,15 +606,15 @@ async function main() {
     }
 
     case "W11": {
-      // AMOUNT（名义额/碎股）线协议形状探测：⚠️ 只 CONFIRM，绝不 SUBMIT。
-      // 2026-10-15 首轮实测（见 git 史）：orderType=AMOUNT 被拒
-      // （"STOCK order may not have AMOUNT type."），错误帧自曝 order 层合法参数
-      // 含 **isNotional** 与 **maxQuantity**，legs 层仅 [symbol, positionEffect,
-      // quantity, taxLotMethod]。第二轮按下表验证 TOS 已知形态：
-      // MARKET + isNotional:true + legs.quantity=美元额（+可选 maxQuantity 上限）。
+      // 名义额（碎股）线协议形状探测：只 CONFIRM，绝不 SUBMIT。
+      // 结论：orderType=AMOUNT 被拒（"STOCK order may not have AMOUNT type."）；
+      // order 层合法参数含 isNotional 与 maxQuantity，legs 层仅
+      // [symbol, positionEffect, quantity, taxLotMethod]。
+      // 下表验证 TOS 已知形态：MARKET + isNotional:true + legs.quantity=美元额
+      // （+ 可选 maxQuantity 上限）。
       const NOTIONAL = Number(process.argv[3] || "2");
       const variants = [
-        // v5：MARKET + isNotional —— 主候选
+        // 主候选
         {
           label: "isNotional-qty",
           order: {
@@ -623,7 +624,7 @@ async function main() {
             legs: [{ symbol: SYMBOL, quantity: NOTIONAL }],
           },
         },
-        // v6：+ maxQuantity 上限（前端碎股单常见搭配）
+        // + maxQuantity 上限（前端碎股单常见搭配）
         {
           label: "isNotional-maxqty",
           order: {
@@ -634,7 +635,7 @@ async function main() {
             legs: [{ symbol: SYMBOL, quantity: NOTIONAL }],
           },
         },
-        // v7：LIMIT + isNotional —— 预期被拒（碎股只允名义市价），拒了也算结论
+        // 预期被拒：碎股只允许名义市价
         {
           label: "isNotional-limit",
           order: {
@@ -662,12 +663,11 @@ async function main() {
           1,
         );
         await sleep(5000);
-        // 只看本变体草稿的帧：前一个草稿的 patch 流会继续推流，混着看会误判
+        // 只看本变体草稿的帧：前一个草稿的 patch 流仍在推，混看会误判
         const mine = seen.filter((i) => i.header?.id === id);
         const err = mine.find((i) => i.header?.type === "error");
-        // 服务端对"字段合法但语义非法"的单不走 error 帧，而是把 error 塞进
-        // 草稿 orders[0].error（首轮实测：AMOUNT type 就是这样被拒的）——
-        // 两处都查才不会被假 ACCEPTED 骗过。
+        // "字段合法但语义非法"的单不走 error 帧，而是把 error 塞进
+        // 草稿 orders[0].error——两处都查才不会误判为 ACCEPTED。
         const orderErr = mine
           .map((i) => i.body?.orders?.[0]?.error ?? null)
           .find(Boolean);
@@ -705,14 +705,15 @@ async function main() {
     }
 
     case "W12": {
-      // 名义额（碎股）单完整下单流，⚠️ 会真成交 —— 仅限 paper（文件头的
-      // papermoney 端点硬闸门是防线）。协议结论（2026-10-15 W11 两轮实测）：
+      // 名义额（碎股）单完整下单流，会真成交——仅限 paper（文件头的 papermoney
+      // 端点硬闸门是防线）。协议结论：
       //   - STOCK 单没有 AMOUNT orderType；legs 没有 amount 字段
       //   - isNotional 是 order 级布尔，"can be set to true only at the SUBMIT stage"
-      //   - 名义额放 legs.quantity（W11 v1 草稿回读：quantity=2 原样保留，
-      //     actionDescription="BUY ~ @345.73 AMT"，服务端理解这是 $2 名义额）
+      //   - 名义额放 legs.quantity（草稿回读 quantity 原样保留，
+      //     actionDescription 带 "AMT" 后缀）
       // 本用例验证 SUBMIT 侧：CONFIRM 建草稿（不带 isNotional）→ SUBMIT 带
-      // isNotional:true → order_events 成交回报里的碎股 quantity。
+      // isNotional:true → order_history 读回 QTY/QTY_FILLED，判定 quantity
+      // 是按美元成交还是被当整股。
       const NOTIONAL = Number(process.argv[3] || "2");
       const draftId = `update-draft-order-${SYMBOL}-w12`;
       send(
@@ -750,8 +751,7 @@ async function main() {
         ],
       });
       await sleep(9000);
-      // 权威读回：order_history 按时间窗拿 QTY/QTY_FILLED/STATUS —— 判定
-      // isNotional 是否真把 quantity 当美元成交，还是被当整股（陷阱）。
+      // 权威读回：order_history 按时间窗拿 QTY/QTY_FILLED/STATUS。
       const nowS = Math.floor(Date.now() / 1000);
       send(ws, "order_history", "w12-hist", {
         account: ACCOUNT,

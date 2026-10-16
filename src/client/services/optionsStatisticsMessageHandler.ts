@@ -4,14 +4,13 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 实测自本地录制：
-// 可用参数集合为 [symbol, refreshRate, deltaIntervals]（"underlyingSymbol"
-// 报 error，见第 1 帧）。
+// 可用参数集合为 [symbol, refreshRate, deltaIntervals]；
+// "underlyingSymbol" 报 error。
 export type OptionsStatisticsRequestParams = {
   symbol: string;
-  // 推送刷新周期；未实测确认单位，chart/quotes 同名参数使用毫秒。
+  // 推送刷新周期；单位未确认，chart/quotes 同名参数使用毫秒。
   refreshRate?: number;
-  // 自定义 delta 分桶；响应 delta 键形如 "21...40"。未实测确认形状。
+  // 自定义 delta 分桶；响应 delta 键形如 "21...40"。形状未确认。
   deltaIntervals?: unknown;
 };
 
@@ -25,8 +24,7 @@ export type OptionsStatisticsBucket = {
   };
 };
 
-// 响应形状实测自第 2 帧 snapshot。响应为 snapshot + 持续 patch 流
-// （同 quotes），门面侧将来以 AsyncIterable 消费。
+// 响应为 snapshot + 持续 patch 流（同 quotes），以 AsyncIterable 消费。
 export type RawPayloadResponseOptionsStatistics = {
   symbol: string;
   pcRatio: number;

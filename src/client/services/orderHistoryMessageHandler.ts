@@ -4,8 +4,7 @@ import WebSocketApiMessageHandler, {
   newPayload,
 } from "./webSocketApiMessageHandler.js";
 
-// 枚举值全量抄自本地录制
-// 第 3 帧服务端错误帧："Possible enum values are [...]"。
+// orderEntryFields 可用枚举（服务端错误帧自曝 "Possible enum values are [...]"）。
 // 发送集合外的值会导致整条请求报 error。
 const ORDER_ENTRY_FIELDS = [
   "TIME_PLACED",
@@ -60,30 +59,30 @@ const ORDER_ENTRY_FIELDS = [
 
 export type OrderHistoryEntryField = (typeof ORDER_ENTRY_FIELDS)[number];
 
-// 服务端校验（线上错误帧）：
+// 服务端校验：
 //  - 必须提供 startTime+endTime 时间对，或 orderId；
 //  - orderEntryFields 与 legFields 至少一个非空；
 //  - 窗口 ≤ 370 天（含两端），startTime 不得晚于当前时间；
-//  - account 必须是真实账户 code（如 "D-XXXXXXXX"，本地录制实测；
-//    "COMBINED ACCOUNT" 报 error "Invalid account number"，第 6 帧）。
+//  - account 必须是真实账户 code（如 "D-XXXXXXXX"）；
+//    "COMBINED ACCOUNT" 报 "Invalid account number"。
 export type OrderHistoryRequestParams = {
   account: string;
-  // epoch **秒**（非毫秒），实测窗口 ≤ 370 天
+  // epoch **秒**（非毫秒），窗口 ≤ 370 天
   startTime: number;
   endTime: number;
   orderEntryFields: OrderHistoryEntryField[];
-  // legFields 未实测确认形状；需要时按 orderEntryFields 同样方式传。
+  // legFields 形状未确认；需要时按 orderEntryFields 同样方式传。
   legFields?: unknown[];
 };
 
-// 条目字段实测自第 7 帧 snapshot（字段随请求 orderEntryFields 裁剪）。
+// 响应条目字段随请求 orderEntryFields 裁剪。
 export type OrderHistoryEntry = {
   timePlaced?: string;
   orderId?: number;
   symbol?: string;
   quantity?: number;
   limitPrice?: number;
-  // 实测值: "CANCELED"；其余终态（FILLED 等）未实测
+  // 已见终态 "CANCELED"；其余（FILLED 等）未观察
   status?: string;
   [key: string]: unknown;
 };

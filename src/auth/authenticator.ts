@@ -1,40 +1,26 @@
-// Authenticator：token 自动续期抽象。
+// Authenticator：token 自动续期。
 //
-// 背景：wsjson login/schwab 响应携带 accessTokenInfo.refreshToken，续期通道 access_token/get（refreshToken 换 accessToken）handler 已
-// 落地。实测口径：accessToken 约 24h 有效——在 23h 阈值前主动刷新，长连接
-// 会话即可跨天存活。
+// accessToken 约 24h 有效，23h 阈值前主动刷新可让长连接跨天存活。
+// 续期通道为 wsjson 的 access_token/get；guest 会话无 refreshToken，
+// getValidToken() 直通现有 token（console.warn 一次，不刷新）。
 //
-// guest 局限：guest 会话无 refreshToken，getValidToken() 走直通
-// 分支（console.warn 一次，不刷新）——**端到端续期回归需真实账户**（已在
-// TECHNICAL.md 与 README 标注）。
-//
-// 注意：不引用任何 REST 续期通道——grant_type=refresh_token 的 REST 路径未
-// 实测（src/auth/refresh.mjs 不存在），按 YAGNI 不做；wsjson 的
-// access_token/get 通道已足够。
-//
-// 真实账户端到端实测（2026-10-14，scripts/exp-auth-refresh.mjs）：
 // - refreshToken 只在 F2A 勾选"信任设备"时签发（login/schwab 帧
 //   accessTokenInfo.refreshToken，len≈248~268）。
-// - 续期成功：{accessExpiresIn:86400, accessToken, refreshToken}，且
-//   refreshToken 一次性轮换（链式二次续期验证通过——新 RT 立即可用，旧 RT
-//   失效）。
-// - **重要语义**：续出的 accessToken 是 EAT（855+ 字符，"S0." 前缀），供
-//   EAT 鉴权的 REST/服务使用；它**不是** wsjson login 帧的 32 字符 session
-//   token（拿它 login 报 NOT_AUTHORIZED: Invalid token (server session id)）。
-//   wsjson 会话 token 另有生命周期，到期需重新走登录（或 tsm 授权链）。
+// - 续期响应 {accessExpiresIn:86400, accessToken, refreshToken}；
+//   refreshToken 一次性轮换——新值立即可用，旧值失效。
+// - 续出的 accessToken 是 EAT（855+ 字符，"S0." 前缀），供 EAT 鉴权的
+//   REST/服务使用；它**不是** wsjson login 帧的 32 字符 session token
+//   （拿它 login 报 NOT_AUTHORIZED: Invalid token (server session id)）。
+//   wsjson 会话 token 另有生命周期，到期需重新登录（或 tsm 授权链）。
 
 import { AuthError, ParsedPayloadResponse } from "../client/tdaWsJsonTypes.js";
 import { RawPayloadResponseAccessTokenGet } from "../client/services/accessTokenGetMessageHandler.js";
 import type { WsJsonClient } from "../client/wsJsonClient.js";
 
-/** accessToken 有效期约 24h，提前 1h 视为到期（实测口径）。 */
+/** accessToken 有效期约 24h，提前 1h 视为到期。 */
 export const DEFAULT_TOKEN_TTL_MS = 23 * 60 * 60 * 1000;
 
-/**
- * 真实账户实测（2026-10-14，scripts/exp-token-scope.mjs）：
- * access_token/get 的 scope 合法值为 "api"；"GENERAL"（guest OAuth REST
- * 侧常用值）被服务端拒 "NOT_AUTHORIZED: Unrecognized scope"。
- */
+/** access_token/get 的 scope 合法值为 "api"；"GENERAL" 被拒 NOT_AUTHORIZED: Unrecognized scope。 */
 export const DEFAULT_REFRESH_SCOPE = "api";
 
 export type AuthTokenPair = {
@@ -54,8 +40,7 @@ export type TokenRefreshResult = {
 
 /**
  * 刷新通道：refreshToken → 新 token 对。默认实现走注入客户端的
- * getAccessToken（access_token/get，wsjson 通道）；测试注入 fake，真实账户
- * 也可注入其他实现（如离线 REST，若日后实测）。
+ * getAccessToken（access_token/get）；也可注入其他实现。
  */
 export type TokenRefreshChannel = (request: {
   refreshToken: string;
@@ -70,7 +55,7 @@ export type AuthenticatorOptions = {
   refreshChannel?: TokenRefreshChannel;
   /** 到期阈值，默认 23h（DEFAULT_TOKEN_TTL_MS） */
   tokenTtlMs?: number;
-  /** access_token/get 的 scope，默认 "api"（真实账户实测值） */
+  /** access_token/get 的 scope，默认 "api" */
   scope?: string;
   /**
    * 持有一个已连接的客户端：缺省刷新通道走它的 getAccessToken
@@ -113,7 +98,7 @@ export default class Authenticator {
         : undefined);
   }
 
-  /** 缺省刷新通道：access_token/get（wsjson 服务，已验证存在） */
+  /** 缺省刷新通道：access_token/get（wsjson 服务） */
   private static wsJsonChannel(client: WsJsonClient): TokenRefreshChannel {
     return async ({ refreshToken, scope, clientId }) => {
       const response: ParsedPayloadResponse = await client.getAccessToken({
@@ -140,8 +125,7 @@ export default class Authenticator {
    * 取当前有效 accessToken：未到期直通；到期且有 refreshToken → 走刷新通道
    * （成功更新内部状态并回调 onTokenRotated）；刷新失败抛 AuthError；
    * 无 refreshToken（guest）→ 直通现有 token，console.warn 一次。
-   * 注意：刷新后返回的是 EAT（见文件头实测口径），与直通时的原始 token
-   * 类型不同。
+   * 刷新后返回的是 EAT，与直通时的原始 token 类型不同。
    */
   async getValidToken(): Promise<string> {
     if (!this.refreshToken) {

@@ -1,7 +1,6 @@
 import GenericIncomingMessageHandler from "../../client/services/genericIncomingMessageHandler.js";
 import { RawPayloadResponse } from "../../client/tdaWsJsonTypes.js";
-// 真实线上帧回放 fixture（录制于 2026-10-13 PaperMoney 会话，
-// scripts/probe-services.mjs 可重新录制，大数组已截断）
+// 线上帧回放 fixture（PaperMoney 会话，大数组已截断）
 import quotesFrames from "../fixtures/quotes.frames.json";
 import chartFrames from "../fixtures/chart.frames.json";
 import depthFrames from "../fixtures/market_depth.frames.json";
@@ -77,8 +76,8 @@ describe("replay of recorded wire frames", () => {
     expect(body.bidQuotes.length).toBeGreaterThan(0);
   });
 
-  it("routes error entries with the request id (real W4 cancel-error frame)", () => {
-    // 来自线上实测的重复撤单错误帧（手工内联避免跨文件依赖）
+  it("routes error entries with the request id (real cancel-error frame)", () => {
+    // 重复撤单错误帧（手工内联避免跨文件依赖）
     const handler = new GenericIncomingMessageHandler();
     const errorFrame = {
       header: {

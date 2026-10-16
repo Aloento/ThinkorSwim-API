@@ -1,4 +1,4 @@
-﻿import WS from "jest-websocket-mock";
+import WS from "jest-websocket-mock";
 import Authenticator, { AuthenticatorOptions } from "../../auth/authenticator";
 import {
   CONNECTION_REQUEST_MESSAGE,
@@ -12,12 +12,12 @@ import type { WsJsonClient } from "../../client/wsJsonClient";
 import { AuthError } from "../../client/tdaWsJsonTypes";
 
 /**
- * 任务12（R1）：Authenticator token 续期。全部 mock——refreshChannel 注入
- * fake，无网络；客户端集成用例复用 connectionLifecycle 的假定时器 +
- * socketFactory 模式（jest-websocket-mock 接管全局 WebSocket）。
+ * Authenticator token 续期。全部 mock——refreshChannel 注入 fake，无网络；
+ * 客户端集成用例复用假定时器 + socketFactory 模式
+ * （jest-websocket-mock 接管全局 WebSocket）。
  *
- * guest 局限：guest 会话无 refreshToken，端到端续期不可验证——直通分支
- * （warn 一次）在单测覆盖，真实账户回归项已标注 TECHNICAL.md 与 README。
+ * guest 会话无 refreshToken，端到端续期不可验证——直通分支（warn 一次）
+ * 在单测覆盖。
  */
 
 const clientId = "TOSWeb";
@@ -43,7 +43,7 @@ function makeAuthenticator(overrides: Partial<AuthenticatorOptions> = {}) {
   return { authenticator, refreshChannel };
 }
 
-describe("Authenticator (R1 token 续期)", () => {
+describe("Authenticator (token 续期)", () => {
   afterEach(() => {
     jest.restoreAllMocks();
   });
@@ -72,7 +72,7 @@ describe("Authenticator (R1 token 续期)", () => {
       scope: "api",
       clientId,
     });
-    // 轮换后的新对回调持久化（refreshToken 一次性，旧值作废）
+    // 新 token 对经 onTokenRotated 交出持久化（refreshToken 一次性，旧值作废）
     expect(onTokenRotated).toHaveBeenCalledWith({
       accessToken: "access-for-refresh-0",
       refreshToken: "rotated-refresh-0",
@@ -214,7 +214,7 @@ describe("Authenticator (R1 token 续期)", () => {
   });
 });
 
-// ---- 客户端集成（要点 2：re-login 前挂 getValidToken） ----
+// ---- 客户端集成：re-login 前挂 getValidToken ----
 
 const WS_URL = "ws://localhost:9910";
 
@@ -372,7 +372,7 @@ describe("RealWsJsonClient × Authenticator（re-login 续期挂点）", () => {
       expect(server2.messages[0]).toEqual(CONNECTION_REQUEST_MESSAGE);
       server2.send(connectionResponse);
       await waitFor(() => server2.messages.length >= 2);
-      // R1 核心：re-login 用的是续期后的新 token，且持久化回调收到新对
+      // re-login 用的是续期后的新 token，且持久化回调收到新对
       expect(refreshChannel).toHaveBeenCalledWith({
         refreshToken: "day1-refresh",
         scope: "api",
