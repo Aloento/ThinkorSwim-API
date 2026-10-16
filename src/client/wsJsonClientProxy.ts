@@ -912,6 +912,13 @@ export class WsJsonClientProxy implements WsJsonClient {
     this.socket!.send(JSON.stringify(message));
   }
 
+  /**
+   * 代理通道的请求分发。注意：与 realWsJsonClient ≤v0.13.1 同款的
+   * "共享拉取队列 + filter 丢弃"形态（TECHNICAL.md §9.12）——同一 method
+   * 并发多次调用时同样会互相吞帧。代理协议按 method 单路复用、当前用法
+   * （testApp 单连接顺序调用）不触发；若代理要承载并发调用，需照
+   * responseRouter.ts 的模式改造（本地 socket 上同样按 key 分队列）。
+   */
   private dispatch<T>(req: Request, args?: any): Observable<T> {
     this.sendMessage({ request: req, args });
     return deferredWrap<ProxiedResponse>(() => this.iterator)

@@ -52,11 +52,12 @@ src/
 │   ├── wsJsonClientProxy.ts  # 本地代理协议两端（S1 鉴权可选）
 │   ├── guard.ts              # 交易安全闸门（paperOnly/白名单/限额）
 │   ├── genericIncomingMessageHandler.ts  # snapshot/patch 合并核心（dataStore）
+│   ├── responseRouter.ts     # 响应帧一对多路由（单泵 + 每订阅专属队列，见下）
 │   ├── subscriptionStream.ts # 流式订阅门面（提前退出回收）
 │   ├── messageTypeHelpers.ts # 帧分类（payload 空防御）
 │   └── services/*.ts         # 68 个服务 handler（每个=一个 wire 服务的参数/响应建模）
 ├── example/testApp.ts        # 用户名密码路径 + 代理示例 + guest 冒烟
-└── test/**                   # jest：帧回放 / 连接生命周期 / guard / 归一化 等
+└── test/**                   # jest：帧回放 / 连接生命周期 / guard / 归一化 / 分发回归 等
 scripts/                      # 黑盒工具（见 §8）
 TECHNICAL.md                  # 本文
 ```
@@ -66,11 +67,15 @@ TECHNICAL.md                  # 本文
 - **消息回路**：连接后先发协议握手 `{ver:"27.*.*", fmt:"json-patches-structured",
 heartbeat:"2s"}` → 服务器回 `{session, build, ver}`；此后服务器每 2s 单向推
   `{"heartbeat":n}`（客户端无需回包）。
-- **请求分发**：每个业务请求带 `header.id`，响应条目**原样回带 id**，路由按
-  `service + id`（+ 跨 ver 基底查找）关联，并发订阅互不串台。
-- **Observable 模型**：请求得到 Observable；`snapshot` 帧是流全量状态，
-  `patch` 帧是 RFC6902 JSON Patch 增量，`fast-json-patch` 合并进
-  `dataStore[service_id]` 基底；一次性请求用 `dispatchOneShot`（断线 reject 不重放）。
+- **响应分发（v1.0.1 重写，见 §9.12）**：`onMessage` 解析出的每一帧交给
+  `ResponseRouter.dispatch`，按 `service + id`（`isResponseForRequest`）投给**每个
+  匹配订阅自己的 FIFO 队列**——一个请求的等待者永不从另一个请求的队列里拉帧。
+  匹配帧同时广播给该订阅上所有正在 `next()` 的取数者（复刻旧 `pendingItem`
+  语义，error 帧能让同一订阅的所有消费者一起终止）。订阅在 `sendMessage` 之前
+  建立（响应先到也不丢），settle/break/会话终结即 `close`。
+- **snapshot/patch 合并**：`snapshot` 帧是流全量状态，`patch` 帧是 RFC6902 JSON
+  Patch 增量，`fast-json-patch` 合并进 `dataStore[service_id]` 基底；一次性请求用
+  `dispatchOneShot`（断线 reject 不重放）。
 
 ## 3. wsjson 线协议
 
@@ -436,6 +441,27 @@ cashFutureTransactionTypes?}`（后三可空数组），真实账户 snapshot 93
 - 响应 header.id 与请求 id 原样回带 → id 路由可行（并发不串台的基础）。
 - `unsubscribe` 是独立服务名（推送 `service$id`），流提前退出时库自动发送。
 - 垃圾帧/空 payload 防御齐备（畸形帧不断流，有测试）。
+
+### 9.12 共享拉取队列必挂（v1.0.1 重写响应分发，线上事故驱动）
+
+≤v0.13.1 的分发是 `deferredWrap(() => iterator).filter(isResponseForRequest)`，
+`iterator = MulticastIterator(单个 BufferedIterator)`。两处语义错配：
+
+1. `BufferedIterator.next()` 是**消费**（shift），一条队列每帧只属于一个拉取者；
+2. obgen `filterIterator` 拿到不匹配的帧**直接丢弃**再拉下一帧。
+
+组合效果：任何"不该在此等待"的消费者（上一轮提前 break 的流、被 error 终止的
+订阅留下的悬挂 `next()`）都成为**永久帧黑洞**——拉走后续每一帧并扔掉，真正
+的收件人永远挂起。触发条件极常见：`for await … break` 后发起同 socket 的下一
+个请求。下游实测（Schwab-DCA run 38878151523）：第一轮全部成功，**第二轮第一
+个网络调用必挂**，探针 100% 复现。
+
+修复（`responseRouter.ts`）：单泵 `dispatch(msg)` 按 `isResponseForRequest` 把
+帧**复制入队**到每个匹配订阅的私有 FIFO；无人等待则留在自己队列，有人等待则
+广播给全部并发 `next()`（保留旧 pendingItem 的 error 同终止语义）。删除
+`buffer`/`iterator`/`bufferEnded` 与全部"重建缓冲"路径；`endAll()` 在会话终结
+释放所有悬挂取数者。教训：**点对点队列上永远不能叠 filter-then-discard**；
+回归测试 `src/test/client/fanOutRegression.test.ts`。
 
 ## 10. 已知限制与协议漂移风险
 
