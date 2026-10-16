@@ -1,18 +1,12 @@
 import debug from "debug";
 import WebSocket from "isomorphic-ws";
 import {
-  BufferedIterator,
-  deferredWrap,
-  MulticastIterator,
-  Observable,
-} from "obgen";
-import {
   isConnectionResponse,
   isLoginResponse,
-  isResponseForRequest,
   isSchwabLoginResponse,
 } from "./messageTypeHelpers.js";
 import ResponseParser from "./responseParser.js";
+import ResponseRouter, { RouterSubscription } from "./responseRouter.js";
 import SubscriptionStream from "./subscriptionStream.js";
 // ---- 扩展服务 handler 与其参数类型----
 import AccessTokenGetMessageHandler, {
@@ -366,8 +360,13 @@ export type RealWsJsonClientOptions = {
 
 export class RealWsJsonClient implements WsJsonClient {
   private readonly genericHandler = new GenericIncomingMessageHandler();
-  private buffer = new BufferedIterator<ParsedPayloadResponse>();
-  private iterator = new MulticastIterator(this.buffer);
+  /**
+   * 响应帧的唯一分发点：onMessage 解析出的每帧调 `router.dispatch`，
+   * 按 service+id 投给每个订阅者**自己的**队列（见 responseRouter.ts——
+   * 共享队列 + filter 丢弃的旧模型在多请求下必然串帧挂死）。
+   * 会话终结/重建时 `endAll()` 清空。
+   */
+  private readonly router = new ResponseRouter();
   private state = ChannelState.DISCONNECTED;
   private credentials: {
     authCode?: string;
@@ -425,8 +424,6 @@ export class RealWsJsonClient implements WsJsonClient {
   private readonly pendingOneShots = new Map<string, (err: Error) => void>();
   /** 本轮 login 成功后是否需要重放订阅并结算 reconnect() promise */
   private pendingReplayAfterLogin = false;
-  /** buffer.end() 是否已调用（重连需重建缓冲时据此判断） */
-  private bufferEnded = false;
 
   constructor(
     options: RealWsJsonClientOptions = {},
@@ -519,12 +516,7 @@ export class RealWsJsonClient implements WsJsonClient {
   private async handshake(): Promise<RawLoginResponseBody | null> {
     switch (this.state) {
       case ChannelState.DISCONNECTED:
-        if (this.bufferEnded) {
-          // 上一轮显式 disconnect 已把旧缓冲置为终态，重建供本轮使用
-          this.buffer = new BufferedIterator<ParsedPayloadResponse>();
-          this.iterator = new MulticastIterator(this.buffer);
-          this.bufferEnded = false;
-        }
+        // router 无需"重建"：endAll 之后新的 subscribe() 直接可用
         this.explicitDisconnect = false;
         this.state = ChannelState.CONNECTING;
         return await this.doConnect();
@@ -610,7 +602,7 @@ export class RealWsJsonClient implements WsJsonClient {
   }
 
   private onMessage(data: string) {
-    const { responseParser, buffer } = this;
+    const { responseParser } = this;
     let message: WsJsonRawMessage;
     // Isolate JSON.parse so a malformed frame cannot kill subsequent message handling.
     try {
@@ -635,8 +627,9 @@ export class RealWsJsonClient implements WsJsonClient {
         // 全部业务帧走通用解析管道（旧的 SUBMIT 完成帧原始拦截
         // 已删除——storeKey 现在按 service+id 跨 ver 命中基底，ver:0 的
         // orderId patch 能正常合并进 ver:1 草稿基底）。
+        // 解析出的每帧交给 router 按 service+id 投给所有匹配订阅者。
         const parsedResponse = responseParser.parseResponse(message);
-        parsedResponse?.forEach((r) => buffer.emit(r));
+        parsedResponse?.forEach((r) => this.router.dispatch(r));
       }
     } catch (e) {
       console.warn("⚠️ Failed to process websocket frame, ignoring: ", e);
@@ -726,7 +719,7 @@ export class RealWsJsonClient implements WsJsonClient {
     }
     this.failReconnectPromise(err);
     this.drainOneShots(err.message);
-    if (!this.bufferEnded) this.endBuffer();
+    this.endBuffer();
   }
 
   // ---- 重连与看门狗 ----
@@ -829,13 +822,9 @@ export class RealWsJsonClient implements WsJsonClient {
     this.clearHeartbeat();
     this.explicitDisconnect = false;
     this.reconnectAttempts = 0;
-    if (this.bufferEnded) {
-      // 显式 disconnect 之后流已终结；重建缓冲供重放使用（旧消费者
-      // 的循环在 disconnect 时已干净退出，不会收到重放数据）。
-      this.buffer = new BufferedIterator<ParsedPayloadResponse>();
-      this.iterator = new MulticastIterator(this.buffer);
-      this.bufferEnded = false;
-    }
+    // router 不需要"重建缓冲"：显式 disconnect 时 endAll 已终结旧订阅，
+    // 新请求的 subscribe() 随时可用；未终结的流式订阅者跨重连继续收重放帧
+    // （与旧共享缓冲模型的语义一致）。
     const promise = new Promise<void>((resolve, reject) => {
       this.resolveReconnect = resolve;
       this.rejectReconnect = reject;
@@ -905,9 +894,10 @@ export class RealWsJsonClient implements WsJsonClient {
   }
 
   private endBuffer() {
-    this.bufferEnded = true;
-    // This ensures that listeners will resolve the promise cleanly from any `for await` loops
-    this.buffer.end();
+    // 会话终结：结束并清空全部订阅队列，释放所有仍挂着的取数者
+    // （for-await 干净退出、one-shot 等待者已由 drainOneShots reject，
+    // 这里的 end 兜底让悬挂的 next() 以 done 结算，绝不留永久悬挂）。
+    this.router.endAll();
     // 整个会话终结、所有流消费者随之退出——全量回收
     // dataStore 补丁基底。重连恢复路径不走这里（消费者还活着，基底要留给
     // 重放后的增量 patch）。
@@ -1142,7 +1132,7 @@ export class RealWsJsonClient implements WsJsonClient {
     // 的 patch，GenericIncomingMessageHandler 按 service+id 跨 ver 命中
     // ver:1 草稿基底，合并后 body.orders[0].orderId 即新订单号。完成帧
     // 之前可能先到 ver:1 的价格 patch（服务端异步注入），isFinal 用
-    // orderId>0 区分终态帧与中间帧；error 帧经 responseObservable 直接
+    // orderId>0 区分终态帧与中间帧；error 帧在订阅迭代器层直接
     // reject（WebSocketApiError），无需在此处理。
     const rejected = this.checkOrderGuard("submitOrder", draft);
     if (rejected) return rejected;
@@ -1550,20 +1540,59 @@ export class RealWsJsonClient implements WsJsonClient {
     // the one it actually sends.
     const { service: requestService, id: requestId } =
       request.payload?.[0]?.header ?? {};
-    this.sendMessage(request);
     // 流式订阅登记：重连成功并重新 login 后原样重发（见 replayActiveRequests）
     if (requestService && requestId) {
       this.activeRequests.set(`${requestService}$${requestId}`, request);
     }
-    const observable = this.responseObservable(requestService, requestId);
+    // 专属队列必须在 sendMessage **之前** 建立：响应帧可能在 send 的同步
+    // 派发中就已到达（mock 场景），先订阅保证零丢帧。
+    // error 帧在订阅迭代器处抛 WebSocketApiError，终止该队列的所有消费者。
     // 流式订阅的资源回收挂到消费者提前退出路径上——
     // SubscriptionStream 的 return()/throw()（for-await 的 break / 抛异常）
     // 经 releaseSubscription 清 dataStore 基底、注销重放登记并 best-effort
-    // 发 unsubscribe。服务端正常终止（buffer.end）不走这里，由 endBuffer
+    // 发 unsubscribe。服务端正常终止（router.endAll）不走这里，由 endBuffer
     // 路径统一清全部。
-    return new SubscriptionStream(observable, () =>
+    const sub = this.subscribedRoute(requestService, requestId);
+    this.sendMessage(request);
+    return new SubscriptionStream(sub, () =>
       this.releaseSubscription(requestService, requestId),
     );
+  }
+
+  /**
+   * 订阅 router 上本请求的专属队列，并加上 error 帧语义：
+   * header.type === "error" 的条目以 WebSocketApiError 抛出（reject 等待
+   * 中的 next()/promise()），而不是作为普通条目透出——与旧
+   * responseObservable.filter 的行为逐字一致。
+   */
+  private subscribedRoute(
+    requestService: string | undefined,
+    requestId: string | undefined,
+  ): RouterSubscription {
+    const sub = this.router.subscribe(requestService, requestId);
+    return {
+      next: async () => {
+        const r = await sub.next();
+        const value = r.value;
+        if (!r.done && value && value.error) {
+          const errInfo = value.error;
+          throw new WebSocketApiError(errInfo.message, {
+            service: value.service,
+            requestId: value.id,
+            isTerminal: errInfo.isTerminal,
+          });
+        }
+        return r;
+      },
+      return: () => {
+        sub.close();
+        return Promise.resolve({ value: undefined, done: true });
+      },
+      [Symbol.asyncIterator]() {
+        return this;
+      },
+      close: () => sub.close(),
+    };
   }
 
   /**
@@ -1580,7 +1609,7 @@ export class RealWsJsonClient implements WsJsonClient {
    * - `isFinal`：从匹配条目中挑出终态响应，缺省仍是「首个匹配条目即终态」。
    *   SUBMIT 的完成帧之前可能先收到草稿的价格 patch（ver:1，服务端异步注入），
    *   这些中间条目被跳过（其 body 已合并进 store，无需透出）。error 条目在
-   *   responseObservable 层直接抛 WebSocketApiError，不受 isFinal 影响。
+   *   订阅迭代器层直接抛 WebSocketApiError，不受 isFinal 影响。
    */
   private dispatchOneShot<Req>(
     handlerCtor: Constructor<WebSocketApiMessageHandler<Req>>,
@@ -1604,10 +1633,9 @@ export class RealWsJsonClient implements WsJsonClient {
         this.pendingOneShots.set(key, (err) => reject(err));
       }
       this.sendMessage(request);
-      const observable = this.responseObservable(requestService, requestId);
-      const pending = options.isFinal
-        ? observable.filter(options.isFinal).promise()
-        : observable.promise();
+      // 专属队列 + 逐条消费：isFinal 未命中就继续 next()（帧留在自己队列
+      // 里，不存在"拉走别人的帧"的问题）；队列 end（会话终结）时干净 reject。
+      const sub = this.subscribedRoute(requestService, requestId);
       const reclaim = (): void => {
         // 一次性请求到达终态，store 条目（若有 patch 基底）resolve 后
         // 立即回收；one-shot 不入 activeRequests，无需发 unsubscribe
@@ -1617,41 +1645,37 @@ export class RealWsJsonClient implements WsJsonClient {
           this.responseParser.removeStore(requestService, requestId);
         }
       };
-      pending.then(
-        (value) => {
-          if (key) this.pendingOneShots.delete(key);
-          reclaim();
-          resolve(value);
-        },
-        (err) => {
-          if (key) this.pendingOneShots.delete(key);
-          reclaim();
-          reject(err);
-        },
-      );
+      const settle = (fn: () => void): void => {
+        if (key) this.pendingOneShots.delete(key);
+        sub.close();
+        reclaim();
+        fn();
+      };
+      const consume = (): void => {
+        sub.next().then(
+          (r) => {
+            if (r.done) {
+              settle(() =>
+                reject(
+                  new TransportError(
+                    "Connection closed before a response for " +
+                      `${requestService}$${requestId}`,
+                  ),
+                ),
+              );
+              return;
+            }
+            if (!options.isFinal || options.isFinal(r.value)) {
+              settle(() => resolve(r.value));
+              return;
+            }
+            consume();
+          },
+          (err) => settle(() => reject(err)),
+        );
+      };
+      consume();
     });
-  }
-
-  /** 按 service+id 过滤已解析流的公共逻辑（error 条目抛 WebSocketApiError） */
-  private responseObservable(
-    requestService: string | undefined,
-    requestId: string | undefined,
-  ): Observable<NonNullable<ParsedPayloadResponse>> {
-    return deferredWrap(() => this.iterator).filter((msg) => {
-      if (!isResponseForRequest(msg, requestService, requestId)) {
-        return false;
-      }
-      if (msg.error) {
-        // header.type === "error" entry: reject the promise (or terminate
-        // the iterable) waiting on this request instead of emitting it.
-        throw new WebSocketApiError(msg.error.message, {
-          service: msg.service,
-          requestId: msg.id,
-          isTerminal: msg.error.isTerminal,
-        });
-      }
-      return true;
-    }) as Observable<NonNullable<ParsedPayloadResponse>>;
   }
 
   /**
@@ -1753,7 +1777,7 @@ export class RealWsJsonClient implements WsJsonClient {
     }
     this.failReconnectPromise(err);
     this.drainOneShots(err.message);
-    if (!this.bufferEnded) this.endBuffer();
+    this.endBuffer();
   }
 
   private dispatchHandler<Req>(
@@ -1770,8 +1794,8 @@ export class RealWsJsonClient implements WsJsonClient {
     this.clearHeartbeat();
     this.clearHandshakeTimer();
     this.pendingReplayAfterLogin = false;
-    // 显式断开后不再重连，旧订阅的消费者已随 buffer.end() 退出；
-    // 清空登记表，避免 reconnect() 向新会话重放无人认领的请求。
+    // 显式断开后不再重连，旧订阅的消费者随 router.endAll()（endBuffer）干净
+    // 退出；清空登记表，避免 reconnect() 向新会话重放无人认领的请求。
     this.activeRequests.clear();
     // 显式断开 = 服务端整个会话销毁，逐个发 unsubscribe 无意义；
     // 直接清空本地 dataStore 的全部补丁基底（TECHNICAL.md 内存增长项）。
@@ -1787,6 +1811,6 @@ export class RealWsJsonClient implements WsJsonClient {
     this.failReconnectPromise(
       new TransportError("Disconnected while reconnecting"),
     );
-    if (!this.bufferEnded) this.endBuffer();
+    this.endBuffer();
   }
 }
