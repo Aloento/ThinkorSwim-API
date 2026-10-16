@@ -487,15 +487,15 @@ cashFutureTransactionTypes?}`（后三可空数组），真实账户 snapshot 93
 
 对照实验（同一 token / 同一 runner / 同一库版本，仅改调用序列）：
 
-| 序列 | 第二次同 id 请求 |
-| --- | --- |
-| `statement` → `statement` | **挂死** |
-| `statement` → 显式 `unsubscribe` → `statement` | 正常（29ms） |
-| `statement` → 等 4s → `statement` | **挂死**（与时间无关） |
-| `positions`（for-await 提前 break 会自动退订）→ `positions` | 正常 |
-| `positions` 不退订 → 第二次 `positions` | **挂死** |
-| `quotes/get` ×2、`accounts` ×2、`market_hours` ×2 | 正常（这些订阅服务端自灭） |
-| `place_order`：CONFIRM → SUBMIT（同草稿 id，action/ver 不同） | 正常（live 实证） |
+| 序列                                                          | 第二次同 id 请求           |
+| ------------------------------------------------------------- | -------------------------- |
+| `statement` → `statement`                                     | **挂死**                   |
+| `statement` → 显式 `unsubscribe` → `statement`                | 正常（29ms）               |
+| `statement` → 等 4s → `statement`                             | **挂死**（与时间无关）     |
+| `positions`（for-await 提前 break 会自动退订）→ `positions`   | 正常                       |
+| `positions` 不退订 → 第二次 `positions`                       | **挂死**                   |
+| `quotes/get` ×2、`accounts` ×2、`market_hours` ×2             | 正常（这些订阅服务端自灭） |
+| `place_order`：CONFIRM → SUBMIT（同草稿 id，action/ver 不同） | 正常（live 实证）          |
 
 结论（三条，都是"必须做"而不是"建议"）：
 
