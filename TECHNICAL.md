@@ -463,6 +463,59 @@ cashFutureTransactionTypes?}`（后三可空数组），真实账户 snapshot 93
 释放所有悬挂取数者。教训：**点对点队列上永远不能叠 filter-then-discard**；
 回归测试 `src/test/client/fanOutRegression.test.ts`。
 
+⚠️ 事后更正：v1.0.1 上线后线上**仍然挂死**（run 38890309284）——本节是同一段
+代码里被一并排除的**另一个真实缺陷**（分发模型错误，测试可复现），但**不是**
+2026-10-16 生产事故的根因。根因见 §9.13（服务端持久订阅 + 重复 subscribe 静默
+忽略），由 v1.0.2 修复。两处都已修，回归测试各一份。
+
+### 9.13 持久订阅的重复 subscribe 被静默忽略（v1.0.2 修，线上事故根因）
+
+`statement`（`account-statement`）是**服务端持久订阅**：首帧 snapshot 之后服务端
+**不销毁**该订阅，后续还会推 patch。于是同一会话里第二次 `subscribe` 同
+`service$id` 时，服务端把它当**重复订阅**处理并**静默忽略**——不回任何帧
+（连 `type:"error"` 都没有）。请求方（Promise 型 `getStatement`）于是永久 await。
+
+线上现场（Schwab-DCA `dist/dca.ts` dry_run，逐帧追踪实测）：
+
+```
+1.33 SEND statement$account-statement      → 1.36 RECV snapshot  ✓（写单前现金复核）
+1.38 positions$positions（break→退订）      → 1.80 第二个 positions 照常回帧 ✓
+1.73/1.75/1.77 quotes/get ×3               → 全部回帧 ✓
+1.88 SEND statement$account-statement      → 永无响应 ✗（写单后现金复核）
+     其后 73s 只有 heartbeat；subs=1（该订阅永远挂着）→ CI 15 分钟人工取消
+```
+
+对照实验（同一 token / 同一 runner / 同一库版本，仅改调用序列）：
+
+| 序列 | 第二次同 id 请求 |
+| --- | --- |
+| `statement` → `statement` | **挂死** |
+| `statement` → 显式 `unsubscribe` → `statement` | 正常（29ms） |
+| `statement` → 等 4s → `statement` | **挂死**（与时间无关） |
+| `positions`（for-await 提前 break 会自动退订）→ `positions` | 正常 |
+| `positions` 不退订 → 第二次 `positions` | **挂死** |
+| `quotes/get` ×2、`accounts` ×2、`market_hours` ×2 | 正常（这些订阅服务端自灭） |
+| `place_order`：CONFIRM → SUBMIT（同草稿 id，action/ver 不同） | 正常（live 实证） |
+
+结论（三条，都是"必须做"而不是"建议"）：
+
+1. **凡服务端持久订阅，同一会话内同 id 只能订阅一次**；要再读必须**先退订**
+   （退订帧先于新 subscribe 到达即可，服务端按到达序处理）。
+2. **一次性读语义的门面必须"读完即退订"**，否则第二次调用必挂且**无任何错误
+   信号**——比报错危险得多（现场表现为 CI 静默挂死 15 分钟）。
+3. **写单路径绝不可退订**：CONFIRM 的草稿订阅（`place_order$update-draft-order-<SYM>`）
+   必须活到 SUBMIT 完成帧（还承载服务端异步注入的价格 patch）。
+
+实现：`dispatchOneShot` 增加显式 `releaseSubscription`（settle 时同步发退订，
+`releaseSubscription()` 自身显式传 `false` 防自递归）；`getStatement` 打开该开关。
+其他门面默认零行为变化——哪些服务是持久订阅只以实测为准，不猜。
+回归测试 `src/test/client/persistentSubscription.test.ts`（假服务端复刻上述订阅
+存活语义；关掉修复即超时失败）。
+
+教训：**网络等待永远要有"沉默即错误"的兜底**。库侧不设全局请求超时（写路径的
+超时语义会引入更大风险），但所有**只读**调用方应自设 deadline（Schwab-DCA 的
+`withTimeout` 即此纵深防御）。
+
 ## 10. 已知限制与协议漂移风险
 
 - **协议私有且会漂移**：服务器 build 一年从 27.2323.x 走到 27.2640.4。服务名、

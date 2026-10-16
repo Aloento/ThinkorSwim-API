@@ -1071,8 +1071,19 @@ export class RealWsJsonClient implements WsJsonClient {
     return this.dispatchOneShot(AccountsMessageHandler, undefined);
   }
 
+  /**
+   * account-statement：账户现金/保证金快照（Promise 型 = 读一次即终态）。
+   *
+   * ⚠️ 必须 `releaseSubscription:true` —— statement 是**服务端持久订阅**：
+   * 快照之后服务端保持订阅存活，同 id 的重复 subscribe 被服务端当作重复订阅
+   * **静默忽略**（不回任何帧，连 error 帧都没有）。Promise 语义要求"读完即退订"，
+   * 否则同一会话里第二次 getStatement 永久挂起（2026-10-16 Schwab-DCA 线上事故，
+   * 实测与对照实验见 TECHNICAL.md §9.13）。
+   */
   getStatement(account: string): Promise<ParsedPayloadResponse> {
-    return this.dispatchOneShot(StatementMessageHandler, account);
+    return this.dispatchOneShot(StatementMessageHandler, account, {
+      releaseSubscription: true,
+    });
   }
 
   getPositions(accountNumber: string): AsyncIterable<ParsedPayloadResponse> {
@@ -1610,6 +1621,13 @@ export class RealWsJsonClient implements WsJsonClient {
    *   SUBMIT 的完成帧之前可能先收到草稿的价格 patch（ver:1，服务端异步注入），
    *   这些中间条目被跳过（其 body 已合并进 store，无需透出）。error 条目在
    *   订阅迭代器层直接抛 WebSocketApiError，不受 isFinal 影响。
+   * - `releaseSubscription`：settle（resolve **或** reject）后向服务端退订本请求
+   *   的订阅。**只对"服务端持久订阅且 Promise 型语义"的服务开**（statement）：
+   *   这类服务端订阅读完不会自灭，同 id 的第二次 subscribe 会被服务端静默忽略，
+   *   客户端于是永久 await（2026-10-16 线上事故）。退订帧在 settle 里同步写入
+   *   socket，先于调用方拿到结果后发出的下一个请求，服务端按到达序处理即可保证
+   *   重订阅被当作新订阅。**写单路径（CONFIRM→SUBMIT 复用同一草稿 id）绝不开**：
+   *   草稿订阅必须活到 SUBMIT 完成帧。
    */
   private dispatchOneShot<Req>(
     handlerCtor: Constructor<WebSocketApiMessageHandler<Req>>,
@@ -1617,6 +1635,7 @@ export class RealWsJsonClient implements WsJsonClient {
     options: {
       reclaimStore?: boolean;
       isFinal?: (msg: ParsedPayloadResponse) => boolean;
+      releaseSubscription?: boolean;
     } = {},
   ): Promise<ParsedPayloadResponse> {
     const handler = findByTypeOrThrow(messageHandlers, handlerCtor);
@@ -1649,6 +1668,13 @@ export class RealWsJsonClient implements WsJsonClient {
         if (key) this.pendingOneShots.delete(key);
         sub.close();
         reclaim();
+        // 服务端订阅处置必须在 fn()（resolve/reject）之前：releaseSubscription
+        // 同步写入 unsubscribe 帧，调用方拿到结果后再发同 id 请求时，那一帧
+        // 已先到达服务端——持久订阅服务（statement）的重复 subscribe 才不会
+        // 被静默忽略。见 options.releaseSubscription 注释与 TECHNICAL §9.13。
+        if (options.releaseSubscription) {
+          this.releaseSubscription(requestService, requestId);
+        }
         fn();
       };
       const consume = (): void => {
@@ -1699,10 +1725,16 @@ export class RealWsJsonClient implements WsJsonClient {
     this.activeRequests.delete(`${service}$${id}`);
     if (!this.autoUnsubscribe || !this.isConnected()) return;
     try {
-      this.dispatchOneShot(UnsubscribeMessageHandler, {
-        targetService: service,
-        targetRequestId: id,
-      }).catch(() => undefined);
+      // releaseSubscription:false 显式给出——退订请求自身绝不能再触发退订
+      // （否则 `unsubscribe$unsubscribe-…` 自递归）。
+      this.dispatchOneShot(
+        UnsubscribeMessageHandler,
+        {
+          targetService: service,
+          targetRequestId: id,
+        },
+        { releaseSubscription: false },
+      ).catch(() => undefined);
     } catch (e) {
       // best-effort：unsubscribe 发送失败不影响本地回收已完成的事实
       debugLog("best-effort unsubscribe failed for %s$%s: %s", service, id, e);
